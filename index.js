@@ -466,7 +466,7 @@ function mainMenu(user) {
     console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
     console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
     console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
-    console.log(` \x1b[1;31m[7]\x1b[0m Logout & Exit\n`);
+    console.log(` \x1b[1;31m[7]\x1b[0m Logout & Exit           \x1b[1;31m[8]\x1b[0m Exit\n`);
 
     rl.question("\x1b[1;35mGDASHER > \x1b[0m", async (choice) => {
         if (choice === '1') await viewLevelComments();
@@ -476,6 +476,7 @@ function mainMenu(user) {
         else if (choice === '5') await postAccountComment(user);
         else if (choice === '6') await deleteAccountComment(user);
         else if (choice === '7') await logout();
+        else if (choice === '8') process.exit();
         mainMenu(user);
     });
 }

@@ -28,6 +28,9 @@ npm install
 node index.js
 ```
 
+**Credits:**
+- Massive thank you to [gd-docs](https://github.com/Rifct/gd-docs) for having an up-to-date documentation on the Geometry Dash protocol easily and readily available at [boomlings.dev](https://boomlings.dev). It saved me a lot of time!
+
 **Configuration**
 - **Environment:** Configure runtime options via environment variables or by editing the small helper modules.
 - **Files to review:** See [auth.js](auth.js) and [network.js](network.js) for authentication and networking setup.

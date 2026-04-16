@@ -3,7 +3,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.0.7-alpha";
+const VERSION = "0.0.8-alpha";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -123,7 +123,10 @@ async function startFlow() {
 async function registerFlow() {
     scene("Account Registration");
 
-    let userName = await question("Username: ");
+    let userName = await question("Username (type 'cancel' to leave): ");
+    if (userName == "cancel") {
+        return startFlow();
+    }
     if (!userName.trim()) {
         console.log("\x1b[31mUsername cannot be blank.\x1b[0m");
         await question("[Press Enter]");
@@ -153,7 +156,7 @@ async function registerFlow() {
     }, DEBUG);
 
     if (res === "1") {
-        console.log(`\n\x1b[32mSuccess! Check ${email} for a link.\x1b[0m`);
+        console.log(`\n\x1b[32mSuccess! Check ${email} for a link to activate your account.\x1b[0m`);
         await new Promise(r => setTimeout(r, 4000));
         startFlow();
     } else {
@@ -178,7 +181,10 @@ async function loginFlow() {
     process.title = "GDasher | Not logged in";
     scene("Account Login");
 
-    let userName = await question("Username: ");
+    let userName = await question("Username (type 'cancel' to leave): ");
+    if (userName == "cancel") {
+        return startFlow();
+    }
     if (!userName.trim()) {
         console.log("\x1b[31mUsername cannot be blank.\x1b[0m");
         await question("[Press Enter]");
@@ -241,7 +247,11 @@ function formatBanTime(seconds) {
 
 async function viewLevelComments() {
     scene("View Level Comments");
-    let levelID = await question("Level ID: ");
+    let levelID = await question("Level ID (type 'cancel' to leave): ");
+    if (levelID == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
     if (!levelID.trim() || isNaN(parseInt(levelID))) {
         console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
@@ -275,7 +285,11 @@ async function postLevelComment(user) {
     scene("Post Comment");
     
     // 1. Get and validate Level ID
-    let levelID = await question("Level ID: ");
+    let levelID = await question("Level ID (type 'cancel' to leave): ");
+    if (levelID == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
     if (!levelID.trim() || isNaN(parseInt(levelID))) {
         console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
@@ -337,7 +351,11 @@ async function postLevelComment(user) {
 
 async function deleteLevelComment(user) {
     scene("Delete Level Comment");
-    let levelID = await question("Level ID: ");
+    let levelID = await question("Level ID (type 'cancel' to leave): ");
+    if (levelID == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
     if (!levelID.trim() || isNaN(parseInt(levelID))) {
         console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
@@ -362,7 +380,11 @@ async function deleteLevelComment(user) {
 
 async function viewAccountComments(user) {
     scene("Account Comments");
-    let targetID = await question(`Acc ID (${user.accountID}): `) || user.accountID;
+    let targetID = await question(`Acc ID (${user.accountID}) (type 'cancel' to leave): `) || user.accountID;
+    if (targetID == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
     if (isNaN(parseInt(targetID))) {
         console.log("\x1b[31mAccount ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
@@ -380,7 +402,11 @@ async function viewAccountComments(user) {
 
 async function postAccountComment(user) {
     scene("Post Status");
-    let msg = await question("Message: ");
+    let msg = await question("Message (type 'cancel' to leave): ");
+    if (msg == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
     if (!msg.trim()) {
         console.log("\x1b[31mMessage cannot be blank.\x1b[0m");
         await question("[Press Enter]");
@@ -397,7 +423,11 @@ async function postAccountComment(user) {
 
 async function deleteAccountComment(user) {
     scene("Delete Account Comment");
-    let commentID = await question("Comment ID: ");
+    let commentID = await question("Comment ID (type 'cancel' to leave): ");
+    if (commentID == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
     if (!commentID.trim() || isNaN(parseInt(commentID))) {
         console.log("\x1b[31mComment ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");

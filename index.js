@@ -1,3 +1,4 @@
+const fs = require("fs").promises;
 const readline = require('readline');
 const auth = require('./auth');
 const network = require('./network');
@@ -439,6 +440,20 @@ async function deleteAccountComment(user) {
     }, DEBUG);
     console.log(res === "1" ? "\x1b[32mRemoved.\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
     await new Promise(r => setTimeout(r, 1200));
+
+}
+
+async function logout(){
+    try{
+        await fs.unlink("./auth.dat");
+        process.exit();
+    }
+    catch (err) {
+        const savedData = auth.loadAuth();
+        console.log("Error deleting data: ", err.message);
+        await question("[Press Enter]");
+        return mainMenu(savedData);
+    }
 }
 
 /** ---------------- MAIN MENU ---------------- **/
@@ -460,13 +475,12 @@ function mainMenu(user) {
         else if (choice === '4') await viewAccountComments(user);
         else if (choice === '5') await postAccountComment(user);
         else if (choice === '6') await deleteAccountComment(user);
-        else if (choice === '7') process.exit();
+        else if (choice === '7') await logout();
         mainMenu(user);
     });
 }
 
 /** ---------------- START ---------------- **/
-
 const saved = auth.loadAuth();
 if (saved) mainMenu(saved);
 else startFlow();

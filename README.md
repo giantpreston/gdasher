@@ -35,7 +35,7 @@ node index.js
 - **Files to review:** See [auth.js](auth.js) and [network.js](network.js) for authentication and networking setup.
 
 **Development**
-- **Run locally:** after `npm install`, edit source files and re-run `node index.js`.
+- **Run locally:** Edit source files and re-run `node index.js`.
 - **Key files:** the main entry and helpers live in [index.js](index.js), [utils.js](utils.js), and [auth.js](auth.js).
 
 **Contributing**

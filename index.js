@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.0.9-alpha";
+const VERSION = "0.1.0-alpha";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -14,8 +14,8 @@ function debug(title, data) {
 }
 
 const ASCII = `\x1b[94m
-  /$$$$$$  /$$$$$$$                      /$$                          
- /$$__  $$| $$__  $$                    | $$                          
+  /$$$$$$  /$$$$$$$                          /$$                          
+ /$$__  $$| $$__  $$                        | $$                          
 | $$  \\__/| $$  \\ $$  /$$$$$$   /$$$$$$$| $$$$$$$   /$$$$$$   /$$$$$$ 
 | $$ /$$$$| $$  | $$ |____  $$ /$$_____/| $$__  $$ /$$__  $$ /$$__  $$
 | $$|_  $$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \\ $$| $$$$$$$$| $$  \\__/
@@ -32,7 +32,6 @@ function hiddenQuestion(query) {
     return new Promise((resolve, reject) => {
         const stdin = process.stdin;
         const stdout = process.stdout;
-
         const initialRawMode = stdin.isRaw;
         let wasResumed = false;
         let input = "";
@@ -40,12 +39,8 @@ function hiddenQuestion(query) {
         const cleanup = () => {
             try {
                 stdin.setRawMode(initialRawMode);
-                if (!wasResumed && !stdin.readableFlowing) {
-                    stdin.pause();
-                }
-            } catch (e) {
-                // stdin might already be closed
-            }
+                if (!wasResumed && !stdin.readableFlowing) stdin.pause();
+            } catch (e) {}
         };
 
         const redisplay = () => {
@@ -55,27 +50,25 @@ function hiddenQuestion(query) {
         };
 
         const onData = (chunk) => {
-            // Process byte-by-byte to handle rapid input correctly
             for (let i = 0; i < chunk.length; i++) {
                 const byte = chunk[i];
-                
-                if (byte === 0x0A || byte === 0x0D || byte === 0x04) { // \n, \r, EOF
+                if (byte === 0x0A || byte === 0x0D || byte === 0x04) {
                     stdin.removeListener("data", onData);
                     cleanup();
                     stdout.write("\n");
                     resolve(input);
                     return;
-                } else if (byte === 0x03) { // Ctrl+C
+                } else if (byte === 0x03) {
                     stdin.removeListener("data", onData);
                     cleanup();
                     reject(new Error("Input cancelled"));
                     return;
-                } else if (byte === 0x7F || byte === 0x08) { // Backspace or \b
+                } else if (byte === 0x7F || byte === 0x08) {
                     if (input.length > 0) {
                         input = input.slice(0, -1);
                         redisplay();
                     }
-                } else if (byte >= 0x20 && byte < 0x7F) { // Printable ASCII
+                } else if (byte >= 0x20 && byte < 0x7F) {
                     input += String.fromCharCode(byte);
                     redisplay();
                 }
@@ -124,33 +117,17 @@ async function startFlow() {
 async function registerFlow() {
     scene("Account Registration");
 
-    let userName = await question("Username (type 'cancel' to leave): ");
-    if (userName == "cancel") {
-        return startFlow();
-    }
-    if (!userName.trim()) {
-        console.log("\x1b[31mUsername cannot be blank.\x1b[0m");
+    let userName = (await question("Username (type 'cancel' to leave): ")).trim();
+    if (userName.toLowerCase() === "cancel") return startFlow();
+    
+    let password = (await hiddenQuestion("Password: ")).trim();
+    let email = (await question("Email: ")).trim();
+
+    if (!userName || !password || !email) {
+        console.log("\x1b[31mFields cannot be blank.\x1b[0m");
         await question("[Press Enter]");
         return registerFlow();
     }
-
-    let password = await hiddenQuestion("Password: ");
-    if (!password.trim()) {
-        console.log("\x1b[31mPassword cannot be blank.\x1b[0m");
-        await question("[Press Enter]");
-        return registerFlow();
-    }
-
-    let email = await question("Email: ");
-    if (!email.trim()) {
-        console.log("\x1b[31mEmail cannot be blank.\x1b[0m");
-        await question("[Press Enter]");
-        return registerFlow();
-    }
-
-    userName = userName.trim();
-    password = password.trim();
-    email = email.trim();
 
     const res = await network.makeRequest('accounts/registerGJAccount.php', {
         userName, password, email, secret: network.SECRETS.account
@@ -182,28 +159,17 @@ async function loginFlow() {
     process.title = "GDasher | Not logged in";
     scene("Account Login");
 
-    let userName = await question("Username (type 'cancel' to leave): ");
-    if (userName == "cancel") {
-        return startFlow();
-    }
-    if (!userName.trim()) {
-        console.log("\x1b[31mUsername cannot be blank.\x1b[0m");
+    let userName = (await question("Username (type 'cancel' to leave): ")).trim();
+    if (userName.toLowerCase() === "cancel") return startFlow();
+
+    let password = (await hiddenQuestion("Password: ")).trim();
+    if (!userName || !password) {
+        console.log("\x1b[31mFields cannot be blank.\x1b[0m");
         await question("[Press Enter]");
         return loginFlow();
     }
-
-    let password = await hiddenQuestion("Password: ");
-    if (!password.trim()) {
-        console.log("\x1b[31mPassword cannot be blank.\x1b[0m");
-        await question("[Press Enter]");
-        return loginFlow();
-    }
-
-    userName = userName.trim();
-    password = password.trim();
 
     const gjp2 = auth.generateGJP2(password);
-
     const response = await network.makeRequest('accounts/loginGJAccount.php', {
         userName, gjp2, udid: utils.generateUDID(), secret: network.SECRETS.account
     }, DEBUG);
@@ -213,6 +179,7 @@ async function loginFlow() {
         const userData = { username: userName, gjp2, accountID, playerID };
         auth.saveAuth(userData);
         console.log("\x1b[32m\nLogin successful!\x1b[0m");
+        await new Promise(r => setTimeout(r, 1000));
         mainMenu(userData);
     } else {
         console.log(`\x1b[31m\nLogin Failed (${response})\x1b[0m`);
@@ -248,24 +215,17 @@ function formatBanTime(seconds) {
 
 async function viewLevelComments() {
     scene("View Level Comments");
-    let levelID = await question("Level ID (type 'cancel' to leave): ");
-    if (levelID == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
-    if (!levelID.trim() || isNaN(parseInt(levelID))) {
+    let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
+    if (levelID.toLowerCase() === "cancel") return;
+
+    if (!levelID || isNaN(parseInt(levelID))) {
         console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
         return viewLevelComments();
     }
-    let mode = await question("Mode (0:Recent, 1:Liked): ") || "0";
-    if (isNaN(parseInt(mode))) mode = "0";
-    let page = await question("Page: ") || "0";
-    if (isNaN(parseInt(page))) page = "0";
 
-    levelID = levelID.trim();
-    mode = mode.trim();
-    page = page.trim();
+    let mode = (await question("Mode (0:Recent, 1:Liked): ") || "0").trim();
+    let page = (await question("Page: ") || "0").trim();
 
     const res = await network.makeRequest('getGJComments21.php', { levelID, page, mode, secret: network.SECRETS.common }, DEBUG);
     const parsed = utils.parseComments(res);
@@ -285,35 +245,26 @@ async function viewLevelComments() {
 async function postLevelComment(user) {
     scene("Post Comment");
     
-    // 1. Get and validate Level ID
-    let levelID = await question("Level ID (type 'cancel' to leave): ");
-    if (levelID == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
-    if (!levelID.trim() || isNaN(parseInt(levelID))) {
+    let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
+    if (levelID.toLowerCase() === "cancel") return;
+    
+    if (!levelID || isNaN(parseInt(levelID))) {
         console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
         return postLevelComment(user);
     }
     
-    // 2. Get and validate Comment Content
-    let content = await question("Comment: ");
-    if (!content.trim()) {
+    let content = (await question("Comment: ")).trim();
+    if (!content) {
         console.log("\x1b[31mComment cannot be blank.\x1b[0m");
         await question("[Press Enter]");
         return postLevelComment(user);
     }
     
-    // 3. Get and validate Percentage
     let pInput = await question("Percentage: ") || "0";
     const percent = parseInt(pInput.replace(/\D/g, '')) || 0;
-    
-    levelID = levelID.trim();
-    content = content.trim();
-    const b64 = utils.base64Encode(content); //
+    const b64 = utils.base64Encode(content);
 
-    // 4. Send the request to the Geometry Dash servers
     const res = await network.makeRequest('uploadGJComment21.php', {
         accountID: user.accountID, 
         gjp2: user.gjp2, 
@@ -321,22 +272,19 @@ async function postLevelComment(user) {
         comment: b64, 
         levelID, 
         percent,
-        chk: utils.generateCHK([user.username, b64, levelID, percent]), //
-        secret: network.SECRETS.common, //
+        chk: utils.generateCHK([user.username, b64, levelID, percent]),
+        secret: network.SECRETS.common,
         gameVersion: "22", 
         binaryVersion: "47"
     }, DEBUG);
 
-    // 5. Response handling with reason tag support
     if (res === "-10") {
         console.log(`\n\x1b[31mPerma-banned by RobTop from comments. Contact support with ID 74 for more info.\x1b[0m`);
     } 
     else if (res.startsWith("temp_")) {
-        // Splits "temp_3600_Reason" into ["temp", "3600", "Reason"]
         const parts = res.split("_");
         const time = parts[1];
         const reason = parts[2] || "No reason provided"; 
-        
         console.log(`\n\x1b[31mBanned for ${formatBanTime(time)}.\x1b[0m`);
         console.log(`\x1b[31mReason: ${reason}\x1b[0m`);
     } 
@@ -352,24 +300,16 @@ async function postLevelComment(user) {
 
 async function deleteLevelComment(user) {
     scene("Delete Level Comment");
-    let levelID = await question("Level ID (type 'cancel' to leave): ");
-    if (levelID == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
-    if (!levelID.trim() || isNaN(parseInt(levelID))) {
-        console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
+    let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
+    if (levelID.toLowerCase() === "cancel") return;
+
+    let commentID = (await question("Comment ID: ")).trim();
+    if (isNaN(parseInt(levelID)) || isNaN(parseInt(commentID))) {
+        console.log("\x1b[31mIDs must be valid numbers.\x1b[0m");
         await question("[Press Enter]");
         return deleteLevelComment(user);
     }
-    let commentID = await question("Comment ID: ");
-    if (!commentID.trim() || isNaN(parseInt(commentID))) {
-        console.log("\x1b[31mComment ID must be a valid number.\x1b[0m");
-        await question("[Press Enter]");
-        return deleteLevelComment(user);
-    }
-    levelID = levelID.trim();
-    commentID = commentID.trim();
+
     const res = await network.makeRequest('deleteGJComment20.php', {
         accountID: user.accountID, gjp2: user.gjp2, commentID, levelID, secret: network.SECRETS.common
     }, DEBUG);
@@ -381,18 +321,16 @@ async function deleteLevelComment(user) {
 
 async function viewAccountComments(user) {
     scene("Account Comments");
-    let targetID = await question(`Acc ID (${user.accountID}) (type 'cancel' to leave): `) || user.accountID;
-    let page = await question("Page (0): ") || 0;
-    if (targetID == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
+    let targetID = (await question(`Acc ID (${user.accountID}) (type 'cancel' to leave): `) || user.accountID).trim();
+    if (targetID.toLowerCase() === "cancel") return;
+
+    let page = (await question("Page (0): ") || "0").trim();
     if (isNaN(parseInt(targetID))) {
         console.log("\x1b[31mAccount ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
         return viewAccountComments(user);
     }
-    targetID = targetID.trim();
+
     const res = await network.makeRequest('getGJAccountComments20.php', {
         accountID: targetID, page: page, secret: network.SECRETS.common, gameVersion: "22"
     }, DEBUG);
@@ -404,17 +342,15 @@ async function viewAccountComments(user) {
 
 async function postAccountComment(user) {
     scene("Post Status");
-    let msg = await question("Message (type 'cancel' to leave): ");
-    if (msg == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
-    if (!msg.trim()) {
+    let msg = (await question("Message (type 'cancel' to leave): ")).trim();
+    if (msg.toLowerCase() === "cancel") return;
+
+    if (!msg) {
         console.log("\x1b[31mMessage cannot be blank.\x1b[0m");
         await question("[Press Enter]");
         return postAccountComment(user);
     }
-    msg = msg.trim();
+
     const res = await network.makeRequest('uploadGJAccComment20.php', {
         accountID: user.accountID, gjp2: user.gjp2,
         comment: utils.base64Encode(msg), secret: network.SECRETS.common, gameVersion: "22"
@@ -425,98 +361,117 @@ async function postAccountComment(user) {
 
 async function deleteAccountComment(user) {
     scene("Delete Account Comment");
-    let commentID = await question("Comment ID (type 'cancel' to leave): ");
-    if (commentID == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
-    if (!commentID.trim() || isNaN(parseInt(commentID))) {
+    let commentID = (await question("Comment ID (type 'cancel' to leave): ")).trim();
+    if (commentID.toLowerCase() === "cancel") return;
+
+    if (!commentID || isNaN(parseInt(commentID))) {
         console.log("\x1b[31mComment ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
         return deleteAccountComment(user);
     }
-    commentID = commentID.trim();
+
     const res = await network.makeRequest('deleteGJAccComment20.php', {
         accountID: user.accountID, gjp2: user.gjp2, commentID, secret: network.SECRETS.common
     }, DEBUG);
     console.log(res === "1" ? "\x1b[32mRemoved.\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
     await new Promise(r => setTimeout(r, 1200));
-
 }
 
 /** ---------------- FRIEND REQUESTS ---------------- **/
 
 async function readFriendRequests(user) {
     scene("Friend Requests");
-    let choice = await question("(0) Received or (1) Sent Requests (type 'cancel' to leave): ");
-    if (choice == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
+    let choice = (await question("(0) Received or (1) Sent Requests (type 'cancel' to leave): ")).trim();
+    if (choice.toLowerCase() === "cancel") return;
+
+    if (!["0", "1"].includes(choice)) {
+        console.log("\x1b[31mYou must make a valid selection between 0 or 1.\x1b[0m");
+        await question("[Press Enter]");
+        return readFriendRequests(user);
     }
-        if (choice > 1 || !choice.trim() || isNaN(parseInt(choice))) {
-            console.log("\x1b[31mYou must make a valid selection between 0 or 1.\x1b[0m");
-            await question("[Press Enter]");
-            return readFriendRequests(user);
+
+    const res = await network.makeRequest('getGJFriendRequests20.php', {
+        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: choice
+    }, DEBUG)
+    const parsed = utils.parseFriendRequests(res);
+    const modeString = choice === "0" ? "Received Requests" : "Sent Requests";
+
+    console.log(`\n\x1b[1;34m[${modeString}]\x1b[0m\n`);
+    if (res == "-2") {
+        console.log("\x1b[31mNo results.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    parsed.forEach(f => {
+        const id = `\x1b[90m#${f.accountID.padEnd(9)}\x1b[0m`;
+        const u = `\x1b[1;36m${f.userName.padEnd(16)}\x1b[0m`;
+        const n = (f.isNew && choice === "0") ? `\x1b[32m(NEW!)\x1b[0m`.padEnd(14) : "".padEnd(6);
+        const ageText = `${f.age} ago`;
+        if (!f.message || f.message === "") {
+            console.log(`${id} ${u} ${ageText} ${n}`);
+        } else {
+            console.log(`${id} ${u} ${ageText} ${n} : ${f.message}`);
         }
+    });
 
-        choice = choice.trim();
-        const res = await network.makeRequest('getGJFriendRequests20.php', {
-            accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: choice
-        }, DEBUG)
-        const parsed = utils.parseFriendRequests(res);
-        console.log(`\n\x1b[1;34m[Friend Requests]\x1b[0m\n`);
-        if (parsed.length === 0) console.log("\x1b[31mNo results.\x1b[0m");
+    if (choice === "0") {
+        let action = (await question("\nDo you want to (A)ccept, (R)eject, or (L)eave: ")).trim().toUpperCase();
+        if (action === "L") return;
 
-        parsed.forEach(f => {
-            const id = `\x1b[90m#${f.accountID.padEnd(9)}\x1b[0m`;
-            const user = `\x1b[1;36m${f.userName.padEnd(16)}\x1b[0m`;
-            const n = (f.isNew && f.isNew !== false && choice == 0) ? `\x1b[32m(NEW!)\x1b[0m`.padEnd(14) : "".padEnd(6);
-            if (!f.message || f.message == "" || f.message == null) {
-                console.log(`${id} ${user} ${f.age} ago ${n}`);
-            } else {
-                console.log(`${id} ${user} ${f.age} ago ${n} : ${f.message}`);
-            }
-        });
-        await question("\n[Press Enter]");
+        if (action === "A") {
+            let target = await question("Enter Account ID: ");
+            const res2 = await network.makeRequest('acceptGJFriendRequest20.php', {
+                accountID: user.accountID, targetAccountID: target, gjp2: user.gjp2, secret: network.SECRETS.common
+            }, DEBUG);
+            console.log(res2 !== "-1" ? "\x1b[32mAccepted!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
+        } 
+        else if (action === "R") {
+            let target = await question("Enter Account ID: ");
+            const res2 = await network.makeRequest('deleteGJFriendRequests20.php', {
+                accountID: user.accountID, targetAccountID: target, gjp2: user.gjp2, secret: network.SECRETS.common
+            }, DEBUG);
+            console.log(res2 !== "-1" ? "\x1b[32mRejected!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
+        }
+    } else {
+        let action = (await question("\nDo you want to (D)elete or (L)eave: ")).trim().toUpperCase();
+        if (action === "D") {
+            let target = await question("Enter Account ID: ");
+            const res2 = await network.makeRequest('deleteGJFriendRequests20.php', {
+                accountID: user.accountID, targetAccountID: target, gjp2: user.gjp2, secret: network.SECRETS.common, isSender: 1
+            }, DEBUG);
+            console.log(res2 !== "-1" ? "\x1b[32mDeleted!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
+        }
+    }
+    await new Promise(r => setTimeout(r, 1200));
 }
 
 async function sendFriendRequest(user) {
     scene("Send Friend Request");
-    let userName = await question("Username (type 'cancel' to leave): ");
-    if (userName == "cancel") {
-        const savedData = auth.loadAuth();
-        return mainMenu(savedData);
-    }
-    if (!userName.trim()) {
+    let userName = (await question("Username (type 'cancel' to leave): ")).trim();
+    if (userName.toLowerCase() === "cancel") return;
+
+    if (!userName) {
         console.log("\x1b[31mPlease insert a valid username.\x1b[0m");
         await question("[Press Enter]");
         return sendFriendRequest(user);
     }
-    let comment = await question("Comment w/ friend req: ");
-    if (!comment.trim()) {
-        console.log("\x1b[31mPlease insert a valid comment.\x1b[0m");
-        await question("[Press Enter]");
-        return sendFriendRequest(user);
-    }
 
-    userName = userName.trim();
+    let comment = await question("Comment w/ friend req (leave blank for no msg): ");
     const res = await network.makeRequest('getGJUsers20.php', {
         secret: network.SECRETS.common, str: userName
     }, DEBUG);
-    if (!res || res == "" || res == null || res == "-1") {
+
+    if (!res || res === "-1") {
         console.log("\x1b[31mUsername not found or server refused request.\x1b[0m");
         await question("[Press Enter]");
-        return mainMenu(user);
     } else {
-        const parsed = utils.parseUser(res);
-        const targetAccountId = parsed.accountID;
-        
+        const targetAccountId = utils.parseUser(res).accountID;
         const res2 = await network.makeRequest('uploadFriendRequest20.php', {
             accountID: user.accountID, toAccountID: targetAccountId, gjp2: user.gjp2, secret: network.SECRETS.common, comment: utils.base64Encode(comment)
         }, DEBUG);
-        console.log(res2 === "1" ? "\x1b[32mSent.\x1b[0m" : "\x1b[31mFailed. The user might have friend requests off.\x1b[0m");
-        await question("[Press Enter]");
-        return mainMenu(user);
+        console.log(res2 === "1" ? "\x1b[32mSent.\x1b[0m" : "\x1b[31mFailed. User may have requests disabled.\x1b[0m");
+        await new Promise(r => setTimeout(r, 1200));
     }
 }
 
@@ -527,27 +482,28 @@ async function logout() {
         await fs.unlink("./auth.dat");
         process.exit();
     } catch (err) {
-        const savedData = auth.loadAuth();
         console.log("Error deleting data: ", err.message);
         await question("[Press Enter]");
-        return mainMenu(savedData);
     }
 }
 
 /** ---------------- MAIN MENU ---------------- **/
 
-function mainMenu(user) {
+async function mainMenu(user) {
     if (!user) return startFlow();
-    process.title = `GDasher | ${user.username}`;
-    scene(`Welcome, ${user.username} - v${VERSION}`);
+    
+    while (true) {
+        process.title = `GDasher | ${user.username}`;
+        scene(`Welcome, ${user.username} - v${VERSION}`);
 
-    console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
-    console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
-    console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
-    console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`)
-    console.log(` \x1b[1;31m[9]\x1b[0m Logout & Exit           \x1b[1;31m[10]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
+        console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
+        console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
+        console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`)
+        console.log(` \x1b[1;31m[9]\x1b[0m Logout & Exit           \x1b[1;31m[10]\x1b[0m Exit\n`);
 
-    rl.question("\x1b[1;35mGDASHER > \x1b[0m", async (choice) => {
+        const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
+
         if (choice === '1') await viewLevelComments();
         else if (choice === '2') await postLevelComment(user);
         else if (choice === '3') await deleteLevelComment(user);
@@ -556,13 +512,14 @@ function mainMenu(user) {
         else if (choice === '6') await deleteAccountComment(user);
         else if (choice === '7') await readFriendRequests(user);
         else if (choice === '8') await sendFriendRequest(user);
-        else if (choice === '9') await logout();
+        else if (choice === '9') { await logout(); break; }
         else if (choice === '10') process.exit();
-        mainMenu(user);
-    });
+    }
 }
 
 /** ---------------- START ---------------- **/
-const saved = auth.loadAuth();
-if (saved) mainMenu(saved);
-else startFlow();
+(async () => {
+    const saved = auth.loadAuth();
+    if (saved) await mainMenu(saved);
+    else await startFlow();
+})();

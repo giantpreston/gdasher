@@ -13,12 +13,11 @@ GDasher is a small Node.js utility that allows Geometry Dash users to make chang
 - **Node.js:** v14 or later
 
 **Installation**
-- Clone the repo and install dependencies:
+- Clone the repo:
 
 ```bash
 git clone https://github.com/giantpreston/gdasher.git
 cd GDasher
-npm install
 ```
 
 **Quick Start**

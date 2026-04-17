@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.0.8-alpha";
+const VERSION = "0.0.9-alpha";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -382,6 +382,7 @@ async function deleteLevelComment(user) {
 async function viewAccountComments(user) {
     scene("Account Comments");
     let targetID = await question(`Acc ID (${user.accountID}) (type 'cancel' to leave): `) || user.accountID;
+    let page = await question("Page (0): ") || 0;
     if (targetID == "cancel") {
         const savedData = auth.loadAuth();
         return mainMenu(savedData);
@@ -393,11 +394,11 @@ async function viewAccountComments(user) {
     }
     targetID = targetID.trim();
     const res = await network.makeRequest('getGJAccountComments20.php', {
-        accountID: targetID, page: 0, secret: network.SECRETS.common, gameVersion: "22"
+        accountID: targetID, page: page, secret: network.SECRETS.common, gameVersion: "22"
     }, DEBUG);
     const parsed = utils.parseComments(res);
     console.log(`\n\x1b[1;34m[Account ${targetID}]\x1b[0m\n`);
-    parsed.forEach(c => console.log(`\x1b[90m#${c.commentID}\x1b[0m [\x1b[33m${c.date}\x1b[0m] : ${c.content}`));
+    parsed.forEach(c => console.log(`\x1b[90m#${c.commentID}\x1b[0m [\x1b[33m${c.date} ago\x1b[0m] : ${c.content}`));
     await question("\n[Enter]");
 }
 
@@ -443,12 +444,89 @@ async function deleteAccountComment(user) {
 
 }
 
-async function logout(){
-    try{
+/** ---------------- FRIEND REQUESTS ---------------- **/
+
+async function readFriendRequests(user) {
+    scene("Friend Requests");
+    let choice = await question("(0) Received or (1) Sent Requests (type 'cancel' to leave): ");
+    if (choice == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
+        if (choice > 1 || !choice.trim() || isNaN(parseInt(choice))) {
+            console.log("\x1b[31mYou must make a valid selection between 0 or 1.\x1b[0m");
+            await question("[Press Enter]");
+            return readFriendRequests(user);
+        }
+
+        choice = choice.trim();
+        const res = await network.makeRequest('getGJFriendRequests20.php', {
+            accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: choice
+        }, DEBUG)
+        const parsed = utils.parseFriendRequests(res);
+        console.log(`\n\x1b[1;34m[Friend Requests]\x1b[0m\n`);
+        if (parsed.length === 0) console.log("\x1b[31mNo results.\x1b[0m");
+
+        parsed.forEach(f => {
+            const id = `\x1b[90m#${f.accountID.padEnd(9)}\x1b[0m`;
+            const user = `\x1b[1;36m${f.userName.padEnd(16)}\x1b[0m`;
+            const n = (f.isNew && f.isNew !== false && choice == 0) ? `\x1b[32m(NEW!)\x1b[0m`.padEnd(14) : "".padEnd(6);
+            if (!f.message || f.message == "" || f.message == null) {
+                console.log(`${id} ${user} ${f.age} ago ${n}`);
+            } else {
+                console.log(`${id} ${user} ${f.age} ago ${n} : ${f.message}`);
+            }
+        });
+        await question("\n[Press Enter]");
+}
+
+async function sendFriendRequest(user) {
+    scene("Send Friend Request");
+    let userName = await question("Username (type 'cancel' to leave): ");
+    if (userName == "cancel") {
+        const savedData = auth.loadAuth();
+        return mainMenu(savedData);
+    }
+    if (!userName.trim()) {
+        console.log("\x1b[31mPlease insert a valid username.\x1b[0m");
+        await question("[Press Enter]");
+        return sendFriendRequest(user);
+    }
+    let comment = await question("Comment w/ friend req: ");
+    if (!comment.trim()) {
+        console.log("\x1b[31mPlease insert a valid comment.\x1b[0m");
+        await question("[Press Enter]");
+        return sendFriendRequest(user);
+    }
+
+    userName = userName.trim();
+    const res = await network.makeRequest('getGJUsers20.php', {
+        secret: network.SECRETS.common, str: userName
+    }, DEBUG);
+    if (!res || res == "" || res == null || res == "-1") {
+        console.log("\x1b[31mUsername not found or server refused request.\x1b[0m");
+        await question("[Press Enter]");
+        return mainMenu(user);
+    } else {
+        const parsed = utils.parseUser(res);
+        const targetAccountId = parsed.accountID;
+        
+        const res2 = await network.makeRequest('uploadFriendRequest20.php', {
+            accountID: user.accountID, toAccountID: targetAccountId, gjp2: user.gjp2, secret: network.SECRETS.common, comment: utils.base64Encode(comment)
+        }, DEBUG);
+        console.log(res2 === "1" ? "\x1b[32mSent.\x1b[0m" : "\x1b[31mFailed. The user might have friend requests off.\x1b[0m");
+        await question("[Press Enter]");
+        return mainMenu(user);
+    }
+}
+
+/** ---------------- LOGOUT HELPER ---------------- **/
+
+async function logout() {
+    try {
         await fs.unlink("./auth.dat");
         process.exit();
-    }
-    catch (err) {
+    } catch (err) {
         const savedData = auth.loadAuth();
         console.log("Error deleting data: ", err.message);
         await question("[Press Enter]");
@@ -466,7 +544,8 @@ function mainMenu(user) {
     console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
     console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
     console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
-    console.log(` \x1b[1;31m[7]\x1b[0m Logout & Exit           \x1b[1;31m[8]\x1b[0m Exit\n`);
+    console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`)
+    console.log(` \x1b[1;31m[9]\x1b[0m Logout & Exit           \x1b[1;31m[10]\x1b[0m Exit\n`);
 
     rl.question("\x1b[1;35mGDASHER > \x1b[0m", async (choice) => {
         if (choice === '1') await viewLevelComments();
@@ -475,8 +554,10 @@ function mainMenu(user) {
         else if (choice === '4') await viewAccountComments(user);
         else if (choice === '5') await postAccountComment(user);
         else if (choice === '6') await deleteAccountComment(user);
-        else if (choice === '7') await logout();
-        else if (choice === '8') process.exit();
+        else if (choice === '7') await readFriendRequests(user);
+        else if (choice === '8') await sendFriendRequest(user);
+        else if (choice === '9') await logout();
+        else if (choice === '10') process.exit();
         mainMenu(user);
     });
 }

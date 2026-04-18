@@ -12,7 +12,6 @@ module.exports = {
 
     generateCHK: (values) => {
         const salt = "0xPT6iUrtws0J";
-        // Ensure values are concatenated exactly as strings
         const combined = values.map(v => v.toString()).join("") + salt;
         const sha1 = crypto.createHash('sha1').update(combined).digest('hex');
         const key = "29481";
@@ -21,6 +20,20 @@ module.exports = {
             result += String.fromCharCode(sha1.charCodeAt(i) ^ key.charCodeAt(i % key.length));
         }
         return Buffer.from(result).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+    },
+
+    decodeLevelPassword: (encodedPass) => {
+        if (!encodedPass) return null;
+        try {
+            const b64 = encodedPass.replace(/-/g, '+').replace(/_/g, '/');
+            const decoded = Buffer.from(b64, 'base64').toString('utf8');
+            const key = "26364";
+            let result = "";
+            for (let i = 0; i < decoded.length; i++) {
+                result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            return result.length > 1 ? result.substring(1) : "0";
+        } catch (e) { return null; }
     },
 
     parseFriendRequests: (rawResponse) => {
@@ -103,7 +116,6 @@ module.exports = {
     parseUserSearch: (rawResponse) => {
         if (!rawResponse || rawResponse === "-1") return [];
         
-        // Search results split multiple users with '|'
         const userSegments = rawResponse.split('#')[0].split('|');
         return userSegments.map(seg => module.exports.parseUser(seg)).filter(u => u !== null);
     },
@@ -138,5 +150,71 @@ module.exports = {
                 content: content
             };
         });
+    },
+
+    parseLevel: (rawResponse) => {
+        if (!rawResponse || rawResponse === "-1") return null;
+
+        const mainData = rawResponse.split('#')[0];
+        const parts = mainData.split(':');
+        const data = {};
+
+        for (let i = 0; i < parts.length; i += 2) {
+            if (parts[i + 1] !== undefined) {
+                data[parts[i]] = parts[i + 1];
+            }
+        }
+
+        let description = "";
+        if (data['3']) {
+            try {
+                const b64 = data['3'].replace(/-/g, '+').replace(/_/g, '/');
+                description = Buffer.from(b64, 'base64').toString('utf8');
+            } catch (e) { description = ""; }
+        }
+
+        return {
+            id: data['1'],
+            name: data['2'],
+            description: description,
+            authorID: data['6'],
+            version: parseInt(data['5']),
+            difficulty: {
+                numerator: parseInt(data['9']),
+                denominator: parseInt(data['8']),
+                isDemon: data['17'] === '1',
+                isAuto: data['25'] === '1',
+                demonDifficulty: parseInt(data['43']) || 0,
+                epicType: parseInt(data['42']) || 0 
+            },
+            stats: {
+                downloads: parseInt(data['10']),
+                likes: parseInt(data['14']),
+                objects: parseInt(data['45']),
+                stars: parseInt(data['18']),
+                coins: parseInt(data['37']),
+                verifiedCoins: data['38'] === '1'
+            },
+            music: {
+                officialSong: parseInt(data['12']),
+                customSongID: data['35'] || null
+            },
+            info: {
+                length: parseInt(data['15']),
+                gameVersion: parseInt(data['13']),
+                uploadDate: data['28'],
+                updateDate: data['29'],
+                password: module.exports.decodeLevelPassword(data['27']),
+                editorTime: parseInt(data['46']) || 0,
+                dailyNumber: parseInt(data['41']) || 0
+            },
+            levelString: data['4'] || null 
+        };
+    },
+
+    parseLevelSearch: (rawResponse) => {
+        if (!rawResponse || rawResponse === "-1") return [];
+        const levelSegments = rawResponse.split('#')[0].split('|');
+        return levelSegments.map(seg => module.exports.parseLevel(seg)).filter(l => l !== null);
     }
 };

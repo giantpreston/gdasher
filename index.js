@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.1.0-alpha";
+const VERSION = "0.1.1-beta";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -14,14 +14,14 @@ function debug(title, data) {
 }
 
 const ASCII = `\x1b[94m
-  /$$$$$$  /$$$$$$$                          /$$                          
- /$$__  $$| $$__  $$                        | $$                          
-| $$  \__/| $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$   /$$$$$$   /$$$$$$ 
+  /$$$$$$  /$$$$$$$                      /$$                          
+ /$$__  $$| $$__  $$                    | $$                          
+| $$  \\__/| $$  \\ $$  /$$$$$$   /$$$$$$$| $$$$$$$   /$$$$$$   /$$$$$$ 
 | $$ /$$$$| $$  | $$ |____  $$ /$$_____/| $$__  $$ /$$__  $$ /$$__  $$
-| $$|_  $$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \ $$| $$$$$$$$| $$  \__/
-| $$  \ $$| $$  | $$ /$$__  $$ \____  $$| $$  | $$| $$_____/| $$      
+| $$|_  $$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \\ $$| $$$$$$$$| $$  \\__/
+| $$  \\ $$| $$  | $$ /$$__  $$ \\____  $$| $$  | $$| $$_____/| $$      
 |  $$$$$$/| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$|  $$$$$$$| $$      
- \______/ |_______/  \_______/|_______/ |__/  |__/ \_______/|__/      \x1b[0m`;
+ \\______/ |_______/  \\_______/|_______/ |__/  |__/ \\_______/|__/      \x1b[0m`;
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(r => rl.question(`\x1b[1;37m${q}\x1b[0m`, r));
@@ -529,6 +529,97 @@ async function checkUsers(user) {
         const user = `\x1b[1;36m${u.username.padEnd(16)}\x1b[0m`;
         console.log(`${id} ${user}`);
     });
+    
+    if (selection == "0") {
+        const choice = (await question("Do you want to (U)nfriend or (L)eave: ")).trim().toUpperCase();
+
+        if (!choice || !["U", "L"].includes(choice)) { console.log("\x1b[31mInvalid choice!"); await question("[Press Enter]"); return checkUsers(user); }
+        if (choice == "U") {
+            const targetAccountId = (await question("Enter Account ID: ")).trim();
+            if (!targetAccountId || isNaN(targetAccountId)) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return checkUsers(user); };
+
+            const res2 = await network.MakeRequest('removeGJFriend20.php', {
+                accountID: user.accountID, gjp2: user.gjp2, targetAccountID: targetAccountId, secret: network.SECRETS.common
+            }, DEBUG);
+            console.log(res2 !== "-1" ? "\x1b[32mUnfriended!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
+        } else { return; }
+    } else {
+        const choice = (await question("Do you want to (U)nblock or (L)eave")).trim().toUpperCase();
+
+        if (!choice || !["U", "L"].includes(choice)) { console.log("\x1b[31mInvalid choice!"); await question("[Press Enter]"); return checkUsers(user); }
+        if (choice == "U") {
+            const targetAccountId = (await question("Enter Account ID: ")).trim();
+            if (!targetAccountId || isNaN(targetAccountId)) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return checkUsers(user); };
+
+            const res2 = await network.MakeRequest('unblockGJUser20.php', {
+                accountID: user.accountID, gjp2: user.gjp2, targetAccountID: targetAccountId, secret: network.SECRETS.common
+            }, DEBUG);
+            console.log(res2 !== "-1" ? "\x1b[32mUnblocked!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
+        }
+    }
+    await new Promise(r => setTimeout(r, 1200));
+}
+
+/** ---------------- LEVELS ---------------- **/
+/** ---------------- LEVELS ---------------- **/
+
+async function checkDaily(user) {
+    scene("Daily/Weekly Lookup");
+    
+    let mode = (await question("(D)aily or (W)eekly level: ")).trim().toUpperCase();
+    if (!['D', 'W'].includes(mode)) {
+        console.log("\x1b[31mInvalid selection.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    const isWeekly = mode === 'W';
+    const type = isWeekly ? 22 : 21;
+    const label = isWeekly ? "Weekly" : "Daily";
+
+    const dailyInfo = await network.makeRequest('getGJDailyLevel.php', {
+        secret: network.SECRETS.common,
+        weekly: isWeekly ? 1 : 0
+    }, DEBUG);
+
+    if (!dailyInfo || dailyInfo === "-1") {
+        console.log(`\x1b[31mFailed to fetch ${label} info.\x1b[0m`);
+        await question("[Press Enter]");
+        return;
+    }
+
+    const [dailyNum, timeLeft] = dailyInfo.split('|');
+    if (!dailyNum || !timeLeft) {
+        console.log("\x1b[31mInvalid response from server.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    const searchID = isWeekly ? parseInt(dailyNum) - 100000 : dailyNum;
+
+    const levelRes = await network.makeRequest('getGJLevels21.php', {
+        secret: network.SECRETS.common,
+        type: type,
+        str: searchID
+    }, DEBUG);
+
+    if (!levelRes || levelRes === "-1") {
+        console.log(`\x1b[31mCould not find ${label} level details.\x1b[0m`);
+        await question("[Press Enter]");
+        return;
+    }
+
+    const parsedLevels = utils.parseLevelSearch(levelRes);
+    const level = parsedLevels[0];
+
+    if (!level) {
+        console.log("\x1b[31mError parsing level data.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    console.log(`\n\x1b[1;32mThe ${label} level is ${level.name}, ID ${level.id}. It awards you ${level.stats.stars} stars. The ${label} level changes in ${formatBanTime(timeLeft)}\x1b[0m`);
+    
     await question("\n[Press Enter]");
 }
 
@@ -557,7 +648,7 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
         console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
         console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`);
-        console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly/event`)
+        console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`)
         console.log(` \x1b[1;31m[11]\x1b[0m Logout & Exit          \x1b[1;31m[12]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
@@ -571,7 +662,7 @@ async function mainMenu(user) {
         else if (choice === '7') await readFriendRequests(user);
         else if (choice === '8') await sendFriendRequest(user);
         else if (choice === '9') await checkUsers(user);
-        else if (choice === '10') await console.log("nothing");
+        else if (choice === '10') await checkDaily(user);
         else if (choice === '11') { await logout(); break; }
         else if (choice === '12') process.exit();
     }

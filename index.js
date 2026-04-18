@@ -538,7 +538,7 @@ async function checkUsers(user) {
             const targetAccountId = (await question("Enter Account ID: ")).trim();
             if (!targetAccountId || isNaN(targetAccountId)) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return checkUsers(user); };
 
-            const res2 = await network.MakeRequest('removeGJFriend20.php', {
+            const res2 = await network.makeRequest('removeGJFriend20.php', {
                 accountID: user.accountID, gjp2: user.gjp2, targetAccountID: targetAccountId, secret: network.SECRETS.common
             }, DEBUG);
             console.log(res2 !== "-1" ? "\x1b[32mUnfriended!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
@@ -551,7 +551,7 @@ async function checkUsers(user) {
             const targetAccountId = (await question("Enter Account ID: ")).trim();
             if (!targetAccountId || isNaN(targetAccountId)) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return checkUsers(user); };
 
-            const res2 = await network.MakeRequest('unblockGJUser20.php', {
+            const res2 = await network.makeRequest('unblockGJUser20.php', {
                 accountID: user.accountID, gjp2: user.gjp2, targetAccountID: targetAccountId, secret: network.SECRETS.common
             }, DEBUG);
             console.log(res2 !== "-1" ? "\x1b[32mUnblocked!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
@@ -560,7 +560,6 @@ async function checkUsers(user) {
     await new Promise(r => setTimeout(r, 1200));
 }
 
-/** ---------------- LEVELS ---------------- **/
 /** ---------------- LEVELS ---------------- **/
 
 async function checkDaily(user) {

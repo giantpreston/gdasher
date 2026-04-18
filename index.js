@@ -16,12 +16,12 @@ function debug(title, data) {
 const ASCII = `\x1b[94m
   /$$$$$$  /$$$$$$$                          /$$                          
  /$$__  $$| $$__  $$                        | $$                          
-| $$  \\__/| $$  \\ $$  /$$$$$$   /$$$$$$$| $$$$$$$   /$$$$$$   /$$$$$$ 
+| $$  \__/| $$  \ $$  /$$$$$$   /$$$$$$$| $$$$$$$   /$$$$$$   /$$$$$$ 
 | $$ /$$$$| $$  | $$ |____  $$ /$$_____/| $$__  $$ /$$__  $$ /$$__  $$
-| $$|_  $$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \\ $$| $$$$$$$$| $$  \\__/
-| $$  \\ $$| $$  | $$ /$$__  $$ \\____  $$| $$  | $$| $$_____/| $$      
+| $$|_  $$| $$  | $$  /$$$$$$$|  $$$$$$ | $$  \ $$| $$$$$$$$| $$  \__/
+| $$  \ $$| $$  | $$ /$$__  $$ \____  $$| $$  | $$| $$_____/| $$      
 |  $$$$$$/| $$$$$$$/|  $$$$$$$ /$$$$$$$/| $$  | $$|  $$$$$$$| $$      
- \\______/ |_______/  \\_______/|_______/ |__/  |__/ \\_______/|__/      \x1b[0m`;
+ \______/ |_______/  \_______/|_______/ |__/  |__/ \_______/|__/      \x1b[0m`;
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (q) => new Promise(r => rl.question(`\x1b[1;37m${q}\x1b[0m`, r));
@@ -88,6 +88,7 @@ function hiddenQuestion(query) {
 }
 
 const scene = (title) => {
+    if (DEBUG !== true) console.clear();
     process.stdout.write('\x1b[2J\x1b[H');
     console.log(ASCII);
     console.log(`\x1b[44m\x1b[1;37m  ${title.toUpperCase().padEnd(60)}  \x1b[0m\n`);
@@ -174,7 +175,7 @@ async function loginFlow() {
         userName, gjp2, udid: utils.generateUDID(), secret: network.SECRETS.account
     }, DEBUG);
 
-    if (response.includes(',')) {
+    if (response && response.includes(',') && response !== "-1") {
         const [accountID, playerID] = response.split(',');
         const userData = { username: userName, gjp2, accountID, playerID };
         auth.saveAuth(userData);
@@ -182,7 +183,7 @@ async function loginFlow() {
         await new Promise(r => setTimeout(r, 1000));
         mainMenu(userData);
     } else {
-        console.log(`\x1b[31m\nLogin Failed (${response})\x1b[0m`);
+        console.log(`\x1b[31m\nLogin Failed (${response === "-1" ? "Invalid Credentials" : response})\x1b[0m`);
         await question("Press Enter...");
         startFlow();
     }
@@ -228,8 +229,15 @@ async function viewLevelComments() {
     let page = (await question("Page: ") || "0").trim();
 
     const res = await network.makeRequest('getGJComments21.php', { levelID, page, mode, secret: network.SECRETS.common }, DEBUG);
-    const parsed = utils.parseComments(res);
+    
+    if (!res || res === "-1") {
+        console.log("\x1b[31mFailed.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
 
+    const parsed = utils.parseComments(res);
+    if (!parsed || parsed.content.length === 0) { console.log("\x1b[31mNo comments.\x1b[0m"); await question("[Press Enter]"); return; }
     console.log(`\n\x1b[1;34m[Comments for ${levelID}]\x1b[0m\n`);
     if (parsed.length === 0) console.log("\x1b[31mNo results.\x1b[0m");
 
@@ -279,9 +287,9 @@ async function postLevelComment(user) {
     }, DEBUG);
 
     if (res === "-10") {
-        console.log(`\n\x1b[31mPerma-banned by RobTop from comments. Contact support with ID 74 for more info.\x1b[0m`);
+        console.log(`\n\x1b[31mPerma-banned by RobTop from comments.\x1b[0m`);
     } 
-    else if (res.startsWith("temp_")) {
+    else if (res && res.startsWith("temp_")) {
         const parts = res.split("_");
         const time = parts[1];
         const reason = parts[2] || "No reason provided"; 
@@ -313,7 +321,7 @@ async function deleteLevelComment(user) {
     const res = await network.makeRequest('deleteGJComment20.php', {
         accountID: user.accountID, gjp2: user.gjp2, commentID, levelID, secret: network.SECRETS.common
     }, DEBUG);
-    console.log(res === "1" ? "\x1b[32mDeleted.\x1b[0m" : "\x1b[31mError.\x1b[0m");
+    console.log(res === "1" ? "\x1b[32mDeleted.\x1b[0m" : "\x1b[31mError deleting comment.\x1b[0m");
     await new Promise(r => setTimeout(r, 1200));
 }
 
@@ -324,17 +332,26 @@ async function viewAccountComments(user) {
     let targetID = (await question(`Acc ID (${user.accountID}) (type 'cancel' to leave): `) || user.accountID).trim();
     if (targetID.toLowerCase() === "cancel") return;
 
-    let page = (await question("Page (0): ") || "0").trim();
     if (isNaN(parseInt(targetID))) {
         console.log("\x1b[31mAccount ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
         return viewAccountComments(user);
     }
 
+    let page = (await question("Page (0): ") || "0").trim();
+
     const res = await network.makeRequest('getGJAccountComments20.php', {
         accountID: targetID, page: page, secret: network.SECRETS.common, gameVersion: "22"
     }, DEBUG);
+
+    if (!res || res === "-1") {
+        console.log("\x1b[31mFailed.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
     const parsed = utils.parseComments(res);
+    if (!parsed || parsed.content.length === 0) { console.log("\x1b[31mNo comments.\x1b[0m"); await question("[Press Enter]"); return; }
     console.log(`\n\x1b[1;34m[Account ${targetID}]\x1b[0m\n`);
     parsed.forEach(c => console.log(`\x1b[90m#${c.commentID}\x1b[0m [\x1b[33m${c.date} ago\x1b[0m] : ${c.content}`));
     await question("\n[Enter]");
@@ -355,7 +372,7 @@ async function postAccountComment(user) {
         accountID: user.accountID, gjp2: user.gjp2,
         comment: utils.base64Encode(msg), secret: network.SECRETS.common, gameVersion: "22"
     }, DEBUG);
-    console.log(res !== "-1" ? "\x1b[32mStatus Updated!\x1b[0m" : "\x1b[31mError.\x1b[0m");
+    console.log(res !== "-1" ? "\x1b[32mStatus Updated!\x1b[0m" : "\x1b[31mError posting status.\x1b[0m");
     await new Promise(r => setTimeout(r, 1200));
 }
 
@@ -373,11 +390,11 @@ async function deleteAccountComment(user) {
     const res = await network.makeRequest('deleteGJAccComment20.php', {
         accountID: user.accountID, gjp2: user.gjp2, commentID, secret: network.SECRETS.common
     }, DEBUG);
-    console.log(res === "1" ? "\x1b[32mRemoved.\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
+    console.log(res === "1" ? "\x1b[32mRemoved.\x1b[0m" : "\x1b[31mFailed to delete.\x1b[0m");
     await new Promise(r => setTimeout(r, 1200));
 }
 
-/** ---------------- FRIEND REQUESTS ---------------- **/
+/** ---------------- SOCIAL ---------------- **/
 
 async function readFriendRequests(user) {
     scene("Friend Requests");
@@ -385,7 +402,7 @@ async function readFriendRequests(user) {
     if (choice.toLowerCase() === "cancel") return;
 
     if (!["0", "1"].includes(choice)) {
-        console.log("\x1b[31mYou must make a valid selection between 0 or 1.\x1b[0m");
+        console.log("\x1b[31mInvalid selection.\x1b[0m");
         await question("[Press Enter]");
         return readFriendRequests(user);
     }
@@ -393,15 +410,22 @@ async function readFriendRequests(user) {
     const res = await network.makeRequest('getGJFriendRequests20.php', {
         accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: choice
     }, DEBUG)
+    
+    if (res === "-2") {
+        console.log("\x1b[31mNo friend requests found.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+    if (res == "-1") {
+        console.log("\x1b[31mFailed.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
     const parsed = utils.parseFriendRequests(res);
     const modeString = choice === "0" ? "Received Requests" : "Sent Requests";
 
     console.log(`\n\x1b[1;34m[${modeString}]\x1b[0m\n`);
-    if (res == "-2") {
-        console.log("\x1b[31mNo results.\x1b[0m");
-        await question("[Press Enter]");
-        return;
-    }
 
     parsed.forEach(f => {
         const id = `\x1b[90m#${f.accountID.padEnd(9)}\x1b[0m`;
@@ -418,7 +442,6 @@ async function readFriendRequests(user) {
     if (choice === "0") {
         let action = (await question("\nDo you want to (A)ccept, (R)eject, or (L)eave: ")).trim().toUpperCase();
         if (action === "L") return;
-
         if (action === "A") {
             let target = await question("Enter Account ID: ");
             const res2 = await network.makeRequest('acceptGJFriendRequest20.php', {
@@ -466,13 +489,47 @@ async function sendFriendRequest(user) {
         console.log("\x1b[31mUsername not found or server refused request.\x1b[0m");
         await question("[Press Enter]");
     } else {
-        const targetAccountId = utils.parseUser(res).accountID;
+        const parsedUser = utils.parseUser(res);
+        if(!parsedUser || !parsedUser.accountID) {
+            console.log("\x1b[31mFailed to parse user data.\x1b[0m");
+            await question("[Press Enter]");
+            return;
+        }
+        const targetAccountId = parsedUser.accountID;
         const res2 = await network.makeRequest('uploadFriendRequest20.php', {
             accountID: user.accountID, toAccountID: targetAccountId, gjp2: user.gjp2, secret: network.SECRETS.common, comment: utils.base64Encode(comment)
         }, DEBUG);
         console.log(res2 === "1" ? "\x1b[32mSent.\x1b[0m" : "\x1b[31mFailed. User may have requests disabled.\x1b[0m");
         await new Promise(r => setTimeout(r, 1200));
     }
+}
+
+async function checkUsers(user) {
+    scene("User List");
+    const selection = (await question("(0) Friends or (1) Blocked (type 'cancel' to leave): ")).trim();
+    if (selection.toLowerCase() == "cancel") {
+        return mainMenu(user);
+    }
+    if (selection > 1 || !selection.trim() || isNaN(selection)) {
+        console.log("\x1b[31mInvalid selection.\x1b[0m");
+        return checkUsers(user);
+    }
+    const res = await network.makeRequest('getGJUserList20.php', {
+        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, type: selection
+    }, DEBUG);
+
+    if (res == "-2") { console.log("\x1b[31mNothing found (empty!).\x1b[0m"); await question("[Press Enter]"); return; };
+    if (res == "-1") { console.log("\x1b[31mFailed.\x1b[0m"); await question("[Press Enter]"); return; };
+    const parsed = utils.parseUserSearch(res);
+    const modeString = selection === "0" ? "Friends List" : "Blocked Users";
+    console.log(`\n\x1b[1;34m[${modeString}]\x1b[0m\n`);
+
+    parsed.forEach(u => {
+        const id = `\x1b[90m#${u.accountID.padEnd(9)}\x1b[0m`;
+        const user = `\x1b[1;36m${u.username.padEnd(16)}\x1b[0m`;
+        console.log(`${id} ${user}`);
+    });
+    await question("\n[Press Enter]");
 }
 
 /** ---------------- LOGOUT HELPER ---------------- **/
@@ -499,8 +556,9 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
         console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
         console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
-        console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`)
-        console.log(` \x1b[1;31m[9]\x1b[0m Logout & Exit           \x1b[1;31m[10]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`);
+        console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly/event`)
+        console.log(` \x1b[1;31m[11]\x1b[0m Logout & Exit          \x1b[1;31m[12]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
 
@@ -512,14 +570,16 @@ async function mainMenu(user) {
         else if (choice === '6') await deleteAccountComment(user);
         else if (choice === '7') await readFriendRequests(user);
         else if (choice === '8') await sendFriendRequest(user);
-        else if (choice === '9') { await logout(); break; }
-        else if (choice === '10') process.exit();
+        else if (choice === '9') await checkUsers(user);
+        else if (choice === '10') await console.log("nothing");
+        else if (choice === '11') { await logout(); break; }
+        else if (choice === '12') process.exit();
     }
 }
 
 /** ---------------- START ---------------- **/
 (async () => {
-    const saved = auth.loadAuth();
+    const saved = await auth.loadAuth();
     if (saved) await mainMenu(saved);
     else await startFlow();
 })();

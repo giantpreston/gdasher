@@ -9,7 +9,6 @@ permissions:
   contents: write
 
 jobs:
-# oo job scary
   build:
     name: Build ${{ matrix.target }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -17,18 +16,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
+
           - os: windows-latest
             target: node18-win-x64
             output: gdasher-win-x64.exe
-          - os: windows-latest
-            target: node18-win-arm64
-            output: gdasher-win-arm64.exe
+
+
           - os: ubuntu-latest
             target: node18-linux-x64
             output: gdasher-linux-x64
           - os: ubuntu-latest
             target: node18-linux-arm64
             output: gdasher-linux-arm64
+
+
           - os: macos-latest
             target: node18-macos-x64
             output: gdasher-macos-x64
@@ -37,21 +38,24 @@ jobs:
             output: gdasher-macos-arm64
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
+
+
+      - name: Setup pkg cache
+        shell: bash
+        run: |
+          mkdir -p ~/.pkg-cache
+          echo "PKG_CACHE_PATH=$HOME/.pkg-cache" >> $GITHUB_ENV
 
       - name: Install pkg
         shell: bash
         run: npm install -g pkg
 
-      - name: Create ephemeral package.json for pkg
+      - name: Create package.json for pkg
         shell: bash
         run: |
           cat > package.json <<'JSON'
@@ -71,38 +75,43 @@ jobs:
           }
           JSON
 
-      - name: Ensure dist directory
+      - name: Prepare dist
         shell: bash
         run: mkdir -p dist
 
-      - name: Build with pkg
+
+      - name: Build with pkg (retry)
         shell: bash
         run: |
-          pkg index.js \
-            --target ${{ matrix.target }} \
-            --output dist/${{ matrix.output }}
+          for i in 1 2 3; do
+            echo "Build attempt $i"
+            pkg index.js \
+              --target ${{ matrix.target }} \
+              --output dist/${{ matrix.output }} && break
+            echo "Retrying..."
+            sleep 5
+          done
 
-      - name: Set icon on Windows builds
+      - name: Set icon (Windows only)
         if: startsWith(matrix.target, 'node18-win')
         shell: bash
         run: |
           npm install -g rcedit
+
           if [[ "${{ github.ref_name }}" == *-beta ]]; then
             ICON="assets/gdasher256beta.ico"
           else
             ICON="assets/gdasher.ico"
           fi
 
-          echo "Setting icon: $ICON"
-          rcedit "dist/${{ matrix.output }}" --set-icon "$ICON"
+          npx rcedit "dist/${{ matrix.output }}" --set-icon "$ICON"
 
-      - name: Make non-Windows binary executable
+      - name: Make executable (non-Windows)
         if: runner.os != 'Windows'
         shell: bash
         run: chmod +x dist/${{ matrix.output }}
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.output }}
           path: dist/${{ matrix.output }}
@@ -113,12 +122,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: dist
 
-      - name: Flatten files
+      - name: Collect files
         shell: bash
         run: |
           mkdir release

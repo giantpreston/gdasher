@@ -1,0 +1,96 @@
+name: Build gdasher binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: node18-win-x64
+            output: gdasher.exe
+          - os: windows-latest
+            target: node18-win-arm64
+            output: gdasher.exe
+          - os: ubuntu-latest
+            target: node18-linux-x64
+            output: gdasher
+          - os: ubuntu-latest
+            target: node18-linux-arm64
+            output: gdasher
+          - os: macos-latest
+            target: node18-macos-x64
+            output: gdasher
+          - os: macos-latest
+            target: node18-macos-arm64
+            output: gdasher
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install pkg
+        run: npm install -g pkg
+
+      - name: Create ephemeral package.json for pkg
+        run: |
+          cat > package.json <<'JSON'
+          {
+            "name": "gdasher-build-temp",
+            "version": "0.0.0",
+            "bin": "index.js",
+            "pkg": {
+              "assets": [
+                "*.js",
+                "assets/**/*",
+                "*.json",
+                "*.md",
+                "LICENSE"
+              ]
+            }
+          }
+          JSON
+
+      - name: Ensure dist directory
+        run: mkdir -p dist
+
+      - name: Build with pkg
+        run: |
+          OUTPUT=dist/${{ matrix.output }}
+          pkg index.js --target ${{ matrix.target }} --output "$OUTPUT"
+
+      - name: Set icon on Windows builds
+        if: startsWith(matrix.target, 'node18-win')
+        shell: pwsh
+        run: |
+          npm install -g rcedit
+          $icon = '${{ endsWith(github.ref_name, '-beta') && 'assets/gdasher256beta.ico' || 'assets/gdasher.ico' }}'
+          Write-Host "Setting icon: $icon"
+          rcedit "dist\${{ matrix.output }}" --set-icon "$icon"
+
+      - name: Make non-Windows binary executable
+        if: ${{ runner.os != 'Windows' }}
+        run: chmod +x dist/${{ matrix.output }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}-${{ github.ref_name }}
+          path: dist/${{ matrix.output }}

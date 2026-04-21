@@ -152,6 +152,60 @@ module.exports = {
         });
     },
 
+    decodeMessageContent: (encodedStr) => {
+        if (!encodedStr) return "";
+        try {
+            const b64 = encodedStr.replace(/-/g, '+').replace(/_/g, '/');
+            const decoded = Buffer.from(b64, 'base64').toString('latin1');
+            const key = "14251";
+            let result = "";
+            for (let i = 0; i < decoded.length; i++) {
+                result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+            }
+            return result;
+        } catch (e) {
+            return "[Decode Error]";
+        }
+    },
+
+    parseMessages: (rawResponse) => {
+        if (!rawResponse || rawResponse === "-1" || rawResponse === "") return [];
+
+        const mainData = rawResponse.split('#')[0];
+        const messageSegments = mainData.split('|');
+
+        return messageSegments.map(msg => {
+            const parts = msg.split(':');
+            const data = {};
+
+            for (let i = 0; i < parts.length; i += 2) {
+                if (parts[i + 1] !== undefined) {
+                    data[parts[i]] = parts[i + 1];
+                }
+            }
+
+            let decodedTitle = "";
+            if (data['4']) {
+                try {
+                    decodedTitle = Buffer.from(data['4'], 'base64').toString('utf8');
+                } catch (e) { decodedTitle = "[Title Error]"; }
+            }
+
+            return {
+                messageID: data['1'],
+                accountID: data['2'],
+                playerID: data['3'],
+                userName: data['6'],
+                subject: decodedTitle,
+                // Only present if the message was downloaded via downloadGJMessage20
+                body: data['5'] ? module.exports.decodeMessageContent(data['5']) : null,
+                age: data['7'],
+                isRead: data['8'] === '1',
+                isSender: data['9'] === '1'
+            };
+        });
+    },
+
     parseLevel: (rawResponse) => {
         if (!rawResponse || rawResponse === "-1") return null;
 

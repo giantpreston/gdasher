@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.1.1-beta";
+const VERSION = "0.1.2-beta";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -560,12 +560,140 @@ async function checkUsers(user) {
     await new Promise(r => setTimeout(r, 1200));
 }
 
+async function readMessages(user) {
+    scene("Messages");
+
+    const selection = (await question("(0) Received Messages or (1) Sent Messages (type 'cancel' to leave): ")).trim();
+    if (selection.toLowerCase() == "cancel") return;
+
+    if (isNaN(selection) || !selection || selection > 1) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return readMessages(user); }
+
+    const res = await network.makeRequest('getGJMessages20.php', {
+        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: selection
+    }, DEBUG)
+    const parsed = utils.parseMessages(res);
+    if (res == "-1") { console.log("\x1b[31mFailed.\x1b[0m"); await question("[Press Enter]"); return; };
+    if (res == "-2") { console.log("\x1b[31mNo messages.\x1b[0m"); await question("[Press Enter]"); return; };
+
+    const modeString = selection === "0" ? "Received Messages" : "Sent Messages";
+    console.log(`\n\x1b[1;34m[${modeString}]\x1b[0m\n`);
+
+    parsed.forEach(m => {
+        const id = `\x1b[90m#${m.accountID.padEnd(9)}\x1b[0m`;
+        const u = `\x1b[1;36m${m.userName.padEnd(16)}\x1b[0m`;
+        const n = (!m.isRead && selection === "0") ? `\x1b[32m(NEW!)\x1b[0m`.padEnd(14) : "".padEnd(6);
+        const ageText = `${m.age} ago`;
+            console.log(`${id} ${u} ${ageText} ${n} : ${m.subject} \x1b[90m(Message ID: #${m.messageID})\x1b[0m`);
+    });
+
+    const choice = (await question("(R)ead Full Content or (L)eave: ")).trim().toUpperCase();
+    if (!['R', 'L'].includes(choice)) { console.log("\x1b[31mInvalid selection.\x1b[0m"); await question("[Press Enter]"); return; }
+
+    if (choice == "R") {
+        const messageId = (await question("Message ID: ")).trim();
+        if (isNaN(messageId) || !messageId) { console.log("\x1b[31mInvalid Message ID.\x1b[0m"); await question("[Press Enter]"); return; }
+        if (selection == 0) {
+            const res2 = await network.makeRequest('downloadGJMessage20.php', {
+                accountID: user.accountID, gjp2: user.gjp2, messageID: messageId, secret: network.SECRETS.common
+            }, DEBUG)
+            if (res2 == "-1") { console.log("\x1b[31mFailed.\x1b[0m"); await question("[Press Enter]"); return; };
+
+            const parsed2 = utils.parseMessages(res2);
+            parsed2.forEach(m2 => {
+            const divider = "\x1b[90m" + "─".repeat(50) + "\x1b[0m";
+            const id = `\x1b[90mID: #${m2.accountID}\x1b[0m`;
+            const usr = `\x1b[1;36m${m2.userName}\x1b[0m`;
+            const subject = `\x1b[1;37mSubject: ${m2.subject}\x1b[0m`;
+            
+            console.log(`\n${divider}`);
+            console.log(`${usr} ${' '.repeat(Math.max(2, 30 - m2.userName.length))} ${id}`);
+            console.log(`${subject}`);
+            console.log(`${divider}`);
+            console.log(`\n${m2.body}`);
+            console.log(`\n${divider}\n`);
+        });
+        await question("[Press Enter]");
+        } else {
+            const res2 = await network.makeRequest('downloadGJMessage20.php', {
+                accountID: user.accountID, gjp2: user.gjp2, messageID: messageId, secret: network.SECRETS.common, isSender: 1
+            }, DEBUG)
+            if (res2 == "-1") { console.log("\x1b[31mFailed.\x1b[0m"); await question("[Press Enter]"); return; };
+
+            const parsed2 = utils.parseMessages(res2);
+            parsed2.forEach(m2 => {
+            const divider = "\x1b[90m" + "─".repeat(50) + "\x1b[0m";
+            const id = `\x1b[90mID: #${m2.accountID}\x1b[0m`;
+            const usr = `\x1b[1;36m${m2.userName}\x1b[0m`;
+            const subject = `\x1b[1;37mSubject: ${m2.subject}\x1b[0m`;
+            
+            console.log(`\n${divider}`);
+            console.log(`${usr} ${' '.repeat(Math.max(2, 30 - m2.userName.length))} ${id}`);
+            console.log(`${subject}`);
+            console.log(`${divider}`);
+            console.log(`\n${m2.body}`);
+            console.log(`\n${divider}\n`);
+        });
+        await question("[Press Enter]");
+        }
+    }
+    if (choice == "L") return;
+}
+
+async function sendMessage(user) {
+    scene("Send Message");
+
+    const uname = (await question("Enter Username (type 'cancel' to leave): ")).trim();
+    if (uname.toLowerCase() == "cancel") return;
+    if (!uname) { 
+        console.log("\x1b[31mInvalid Username!"); 
+        await question("[Press Enter]"); 
+        return readMessages(user); 
+    }
+
+    const subj = await question("Subject: ");
+    const msg = await question("Body: ");
+    const key = "14251";
+    let xorBody = "";
+    
+    for (let i = 0; i < msg.length; i++) {
+        xorBody += String.fromCharCode(msg.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+    }
+
+    const res = await network.makeRequest('getGJUsers20.php', {
+        secret: network.SECRETS.common, 
+        str: uname
+    }, DEBUG);
+
+    if (res == "-1") { 
+        console.log("\x1b[31mUsername not found or server refused request.\x1b[0m"); 
+        await question("[Press Enter]"); 
+        return; 
+    }
+
+    const parsed = utils.parseUser(res);
+
+    const res2 = await network.makeRequest('uploadGJMessage20.php', {
+        accountID: user.accountID, 
+        gjp2: user.gjp2, 
+        toAccountID: parsed.accountID, 
+        subject: utils.base64Encode(subj), 
+        body: utils.base64Encode(xorBody),
+        secret: network.SECRETS.common
+    }, DEBUG);
+
+    console.log(res2 !== "-1" ? "\x1b[32mSent!\x1b[0m" : "\x1b[31mFailed. User might have messages off.\x1b[0m");
+
+    await new Promise(r => setTimeout(r, 1200));
+}
+
 /** ---------------- LEVELS ---------------- **/
 
 async function checkDaily(user) {
     scene("Daily/Weekly Lookup");
     
-    let mode = (await question("(D)aily or (W)eekly level: ")).trim().toUpperCase();
+    let mode = (await question("(D)aily or (W)eekly level (type 'cancel' to leave): ")).trim().toUpperCase();
+    if (mode.toLowerCase() == "cancel") return;
+
     if (!['D', 'W'].includes(mode)) {
         console.log("\x1b[31mInvalid selection.\x1b[0m");
         await question("[Press Enter]");
@@ -647,8 +775,9 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);
         console.log(` \x1b[1;36m[3]\x1b[0m Delete Level Comment    \x1b[1;36m[6]\x1b[0m Delete Account Comment`);
         console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`);
-        console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`)
-        console.log(` \x1b[1;31m[11]\x1b[0m Logout & Exit          \x1b[1;31m[12]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`);
+        console.log(` \x1b[1;36m[11]\x1b[0m Read Messages          \x1b[1;36m[12]\x1b[0m Send a Message`);
+        console.log(` \x1b[1;31m[13]\x1b[0m Logout & Exit          \x1b[1;31m[14]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
 
@@ -662,8 +791,10 @@ async function mainMenu(user) {
         else if (choice === '8') await sendFriendRequest(user);
         else if (choice === '9') await checkUsers(user);
         else if (choice === '10') await checkDaily(user);
-        else if (choice === '11') { await logout(); break; }
-        else if (choice === '12') process.exit();
+        else if (choice === '11') await readMessages(user);
+        else if (choice === '12') await sendMessage(user);
+        else if (choice === '13') { await logout(); break; }
+        else if (choice === '14') process.exit();
     }
 }
 

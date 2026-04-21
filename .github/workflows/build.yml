@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -18,22 +18,22 @@ jobs:
         include:
           - os: windows-latest
             target: node18-win-x64
-            output: gdasher.exe
+            output: gdasher-win-x64.exe
           - os: windows-latest
             target: node18-win-arm64
-            output: gdasher.exe
+            output: gdasher-win-arm64.exe
           - os: ubuntu-latest
             target: node18-linux-x64
-            output: gdasher
+            output: gdasher-linux-x64
           - os: ubuntu-latest
             target: node18-linux-arm64
-            output: gdasher
+            output: gdasher-linux-arm64
           - os: macos-latest
             target: node18-macos-x64
-            output: gdasher
+            output: gdasher-macos-x64
           - os: macos-latest
             target: node18-macos-arm64
-            output: gdasher
+            output: gdasher-macos-arm64
 
     steps:
       - name: Checkout repository
@@ -50,6 +50,7 @@ jobs:
         run: npm install -g pkg
 
       - name: Create ephemeral package.json for pkg
+        shell: bash
         run: |
           cat > package.json <<'JSON'
           {
@@ -86,11 +87,35 @@ jobs:
           rcedit "dist\${{ matrix.output }}" --set-icon "$icon"
 
       - name: Make non-Windows binary executable
-        if: ${{ runner.os != 'Windows' }}
+        if: runner.os != 'Windows'
         run: chmod +x dist/${{ matrix.output }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.output }}-${{ github.ref_name }}
+          name: ${{ matrix.output }}
           path: dist/${{ matrix.output }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Flatten files
+        run: |
+          mkdir release
+          find dist -type f -exec cp {} release/ \;
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: release/*

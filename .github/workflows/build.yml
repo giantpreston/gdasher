@@ -9,6 +9,7 @@ permissions:
   contents: write
 
 jobs:
+# oo job scary
   build:
     name: Build ${{ matrix.target }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -47,6 +48,7 @@ jobs:
           node-version: 18
 
       - name: Install pkg
+        shell: bash
         run: npm install -g pkg
 
       - name: Create ephemeral package.json for pkg
@@ -70,24 +72,33 @@ jobs:
           JSON
 
       - name: Ensure dist directory
+        shell: bash
         run: mkdir -p dist
 
       - name: Build with pkg
+        shell: bash
         run: |
-          OUTPUT=dist/${{ matrix.output }}
-          pkg index.js --target ${{ matrix.target }} --output "$OUTPUT"
+          pkg index.js \
+            --target ${{ matrix.target }} \
+            --output dist/${{ matrix.output }}
 
       - name: Set icon on Windows builds
         if: startsWith(matrix.target, 'node18-win')
-        shell: pwsh
+        shell: bash
         run: |
           npm install -g rcedit
-          $icon = '${{ endsWith(github.ref_name, '-beta') && 'assets/gdasher256beta.ico' || 'assets/gdasher.ico' }}'
-          Write-Host "Setting icon: $icon"
-          rcedit "dist\${{ matrix.output }}" --set-icon "$icon"
+          if [[ "${{ github.ref_name }}" == *-beta ]]; then
+            ICON="assets/gdasher256beta.ico"
+          else
+            ICON="assets/gdasher.ico"
+          fi
+
+          echo "Setting icon: $ICON"
+          rcedit "dist/${{ matrix.output }}" --set-icon "$ICON"
 
       - name: Make non-Windows binary executable
         if: runner.os != 'Windows'
+        shell: bash
         run: chmod +x dist/${{ matrix.output }}
 
       - name: Upload build artifact
@@ -108,6 +119,7 @@ jobs:
           path: dist
 
       - name: Flatten files
+        shell: bash
         run: |
           mkdir release
           find dist -type f -exec cp {} release/ \;

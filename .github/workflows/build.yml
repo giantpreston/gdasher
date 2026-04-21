@@ -16,11 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-
           - os: windows-latest
             target: node18-win-x64
             output: gdasher-win-x64.exe
-
 
           - os: ubuntu-latest
             target: node18-linux-x64
@@ -28,7 +26,6 @@ jobs:
           - os: ubuntu-latest
             target: node18-linux-arm64
             output: gdasher-linux-arm64
-
 
           - os: macos-latest
             target: node18-macos-x64
@@ -43,7 +40,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-
 
       - name: Setup pkg cache
         shell: bash
@@ -79,7 +75,6 @@ jobs:
         shell: bash
         run: mkdir -p dist
 
-
       - name: Build with pkg (retry)
         shell: bash
         run: |
@@ -91,20 +86,6 @@ jobs:
             echo "Retrying..."
             sleep 5
           done
-
-      - name: Set icon (Windows only)
-        if: startsWith(matrix.target, 'node18-win')
-        shell: bash
-        run: |
-          npm install -g rcedit
-
-          if [[ "${{ github.ref_name }}" == *-beta ]]; then
-            ICON="assets/gdasher256beta.ico"
-          else
-            ICON="assets/gdasher.ico"
-          fi
-
-          npx rcedit "dist/${{ matrix.output }}" --set-icon "$ICON"
 
       - name: Make executable (non-Windows)
         if: runner.os != 'Windows'

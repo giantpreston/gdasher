@@ -399,8 +399,11 @@ async function deleteAccountComment(user) {
 async function readFriendRequests(user) {
     scene("Friend Requests");
     let choice = (await question("(0) Received or (1) Sent Requests (type 'cancel' to leave): ")).trim();
+    let page = (await question("Page (0): ")).trim();
+    if (!page || page == null) page = 0;
     if (choice.toLowerCase() === "cancel") return;
 
+    if (isNaN(page)) { console.log("\x1b[31mInvalid page.\x1b[0m"); await question("[Press Enter]"); return readFriendRequests(user); }
     if (!["0", "1"].includes(choice)) {
         console.log("\x1b[31mInvalid selection.\x1b[0m");
         await question("[Press Enter]");
@@ -408,7 +411,7 @@ async function readFriendRequests(user) {
     }
 
     const res = await network.makeRequest('getGJFriendRequests20.php', {
-        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: choice
+        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, page: page, getSent: choice
     }, DEBUG)
     
     if (res === "-2") {
@@ -564,12 +567,15 @@ async function readMessages(user) {
     scene("Messages");
 
     const selection = (await question("(0) Received Messages or (1) Sent Messages (type 'cancel' to leave): ")).trim();
+    let page = (await question("Page (0): ")).trim();
+    if (!page || page == null) page = 0;
     if (selection.toLowerCase() == "cancel") return;
 
     if (isNaN(selection) || !selection || selection > 1) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return readMessages(user); }
+    if (isNaN(page)) { console.log("\x1b[31mInvalid page.\x1b[0m"); await question("[Press Enter]"); return readFriendRequests(user); }
 
     const res = await network.makeRequest('getGJMessages20.php', {
-        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, getSent: selection
+        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, page: page, getSent: selection
     }, DEBUG)
     const parsed = utils.parseMessages(res);
     if (res == "-1") { console.log("\x1b[31mFailed.\x1b[0m"); await question("[Press Enter]"); return; };

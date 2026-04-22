@@ -572,7 +572,7 @@ async function readMessages(user) {
     if (selection.toLowerCase() == "cancel") return;
 
     if (isNaN(selection) || !selection || selection > 1) { console.log("\x1b[31mInvalid ID!"); await question("[Press Enter]"); return readMessages(user); }
-    if (isNaN(page)) { console.log("\x1b[31mInvalid page.\x1b[0m"); await question("[Press Enter]"); return readFriendRequests(user); }
+    if (isNaN(page)) { console.log("\x1b[31mInvalid page.\x1b[0m"); await question("[Press Enter]"); return readMessages(user); }
 
     const res = await network.makeRequest('getGJMessages20.php', {
         accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, page: page, getSent: selection

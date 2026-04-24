@@ -237,7 +237,7 @@ async function viewLevelComments() {
     }
 
     const parsed = utils.parseComments(res);
-    if (!parsed || parsed.content.length === 0) { console.log("\x1b[31mNo comments.\x1b[0m"); await question("[Press Enter]"); return; }
+    if (!parsed || parsed.length === 0) { console.log("\x1b[31mNo comments.\x1b[0m"); await question("[Press Enter]"); return; }
     console.log(`\n\x1b[1;34m[Comments for ${levelID}]\x1b[0m\n`);
     if (parsed.length === 0) console.log("\x1b[31mNo results.\x1b[0m");
 
@@ -351,7 +351,7 @@ async function viewAccountComments(user) {
     }
 
     const parsed = utils.parseComments(res);
-    if (!parsed || parsed.content.length === 0) { console.log("\x1b[31mNo comments.\x1b[0m"); await question("[Press Enter]"); return; }
+    if (!parsed || parsed.length === 0) { console.log("\x1b[31mNo comments.\x1b[0m"); await question("[Press Enter]"); return; }
     console.log(`\n\x1b[1;34m[Account ${targetID}]\x1b[0m\n`);
     parsed.forEach(c => console.log(`\x1b[90m#${c.commentID}\x1b[0m [\x1b[33m${c.date} ago\x1b[0m] : ${c.content}`));
     await question("\n[Enter]");

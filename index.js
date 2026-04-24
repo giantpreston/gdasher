@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.1.2-beta";
+const VERSION = "0.1.3-beta";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {

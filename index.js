@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.1.4-beta";
+const VERSION = "0.1.5";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -717,7 +717,7 @@ async function lookupUser(user) {
         return;
     }
 
-    const divider = "\x1b[90m" + "─".repeat(56) + "\x1b[0m";
+    const divider = "\x1b[90m" + "─".repeat(76) + "\x1b[0m";
     console.log(`\n${divider}`);
     console.log(`\x1b[1;36mUsername:\x1b[0m ${parsed.username}`);
     console.log(`\x1b[1;36mAccount ID:\x1b[0m ${parsed.accountID}`);
@@ -731,9 +731,11 @@ async function lookupUser(user) {
     const stats = [];
     stats.push(`Stars: ${utils.formatNumber(parsed.stars)}`);
     stats.push(`Demons: ${utils.formatNumber(parsed.demons)}`);
+    stats.push(`User Coins: ${utils.formatNumber(parsed.userCoins)}`);
+    stats.push(`Secret Coins: ${utils.formatNumber(parsed.secretCoins)}`);
     if (parseInt(parsed.creatorPoints) > 0) stats.push(`Creator Points: ${utils.formatNumber(parsed.creatorPoints)}`);
     console.log(`\x1b[1;33mStats:\x1b[0m   ${stats.join('   ')}`);
-    console.log(`\x1b[1;33m         \x1b[0m   Diamonds: ${utils.formatNumber(parsed.diamonds)}   Moons: ${utils.formatNumber(parsed.moons)}`);
+    console.log(`\x1b[1;33m                         \x1b[0m   Diamonds: ${utils.formatNumber(parsed.diamonds)}   Moons: ${utils.formatNumber(parsed.moons)}`);
     console.log(`${divider}`);
 
     const s = parsed.socials || {};
@@ -746,6 +748,14 @@ async function lookupUser(user) {
         if (s.instagram) console.log(`  Instagram: ${s.instagram}`);
         console.log(divider);
     }
+    console.log('\x1b[1;33mSocial Settings:\x1b[0m');
+
+    const chs = parsed.commentHistoryState === 0 ? 'Everyone' : parsed.commentHistoryState === 1 ? 'Friends Only' : 'No one';
+    const frs = parsed.friendsState === 0 ? 'Everyone' : 'No one';
+    const ms = parsed.messageState === 0 ? 'Everyone' : parsed.messageState === 1 ? 'Friends Only' : 'No one';
+    console.log(`  Comment History Status: ${chs}`);
+    console.log(`  Friend Request Status: ${frs}`);
+    console.log(`  Message Status: ${ms}`);
 
     await question("[Press Enter]");
 }

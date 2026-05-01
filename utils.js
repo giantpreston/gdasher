@@ -103,6 +103,11 @@ module.exports = {
             demons: parseInt(data['4']) || 0,
             creatorPoints: parseInt(data['8']) || 0,
             diamonds: parseInt(data['46']) || 0,
+            secretCoins: parseInt(data['13']) || 0,
+            userCoins: parseInt(data['17']) || 0,
+            commentHistoryState: parseInt(data['50']) || 0, // Who can view this user's comment history. 0: All, 1: Friends Only, 2: None
+            friendsState: parseInt(data['19']) || 0, // 0: All, 1: None
+            messageState: parseInt(data['18']) || 0, // 0: All, 1: Friends Only, 2: None
             moons: parseInt(data['52']) || 0,
             accountID: data['16'],
             globalRank: data['30'] || null,

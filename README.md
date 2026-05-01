@@ -3,8 +3,6 @@
 GDasher is a small Node.js utility that allows Geometry Dash users to make changes to their own Geometry Dash accounts via a small and lightweight CLI menu tool.
 
 GDasher doesn't make use of any external libraries apart from those provided directly by Node.js, ensuring the project remains lightweight.
-> [!NOTE]
-> This project is still in its Beta phase, meaning it might be unstable, contain bugs, or features that don't work properly. You can use GDasher, but stability is not guaranteed.
 
 **Features**
 - **Network helpers:** reusable request logic and connection helpers.

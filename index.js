@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.1.3-beta";
+const VERSION = "0.1.4-beta";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -40,7 +40,7 @@ function hiddenQuestion(query) {
             try {
                 stdin.setRawMode(initialRawMode);
                 if (!wasResumed && !stdin.readableFlowing) stdin.pause();
-            } catch (e) {}
+            } catch (e) { }
         };
 
         const redisplay = () => {
@@ -99,7 +99,7 @@ const scene = (title) => {
 async function startFlow() {
     process.title = "GDasher | Not logged in";
     scene("Welcome to GDasher");
-    
+
     console.log(` \x1b[1;36m[1]\x1b[0m Login`);
     console.log(` \x1b[1;36m[2]\x1b[0m Register New Account`);
     console.log(` \x1b[1;31m[3]\x1b[0m Exit\n`);
@@ -109,7 +109,7 @@ async function startFlow() {
     if (choice === '1') return loginFlow();
     if (choice === '2') return registerFlow();
     if (choice === '3') process.exit();
-    
+
     startFlow();
 }
 
@@ -120,7 +120,7 @@ async function registerFlow() {
 
     let userName = (await question("Username (type 'cancel' to leave): ")).trim();
     if (userName.toLowerCase() === "cancel") return startFlow();
-    
+
     let password = (await hiddenQuestion("Password: ")).trim();
     let email = (await question("Email: ")).trim();
 
@@ -229,7 +229,7 @@ async function viewLevelComments() {
     let page = (await question("Page: ") || "0").trim();
 
     const res = await network.makeRequest('getGJComments21.php', { levelID, page, mode, secret: network.SECRETS.common }, DEBUG);
-    
+
     if (!res || res === "-1") {
         console.log("\x1b[31mFailed.\x1b[0m");
         await question("[Press Enter]");
@@ -252,53 +252,53 @@ async function viewLevelComments() {
 
 async function postLevelComment(user) {
     scene("Post Comment");
-    
+
     let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
     if (levelID.toLowerCase() === "cancel") return;
-    
+
     if (!levelID || isNaN(parseInt(levelID))) {
         console.log("\x1b[31mLevel ID must be a valid number.\x1b[0m");
         await question("[Press Enter]");
         return postLevelComment(user);
     }
-    
+
     let content = (await question("Comment: ")).trim();
     if (!content) {
         console.log("\x1b[31mComment cannot be blank.\x1b[0m");
         await question("[Press Enter]");
         return postLevelComment(user);
     }
-    
+
     let pInput = await question("Percentage: ") || "0";
     const percent = parseInt(pInput.replace(/\D/g, '')) || 0;
     const b64 = utils.base64Encode(content);
 
     const res = await network.makeRequest('uploadGJComment21.php', {
-        accountID: user.accountID, 
-        gjp2: user.gjp2, 
+        accountID: user.accountID,
+        gjp2: user.gjp2,
         userName: user.username,
-        comment: b64, 
-        levelID, 
+        comment: b64,
+        levelID,
         percent,
         chk: utils.generateCHK([user.username, b64, levelID, percent]),
         secret: network.SECRETS.common,
-        gameVersion: "22", 
+        gameVersion: "22",
         binaryVersion: "47"
     }, DEBUG);
 
     if (res === "-10") {
         console.log(`\n\x1b[31mPerma-banned by RobTop from comments.\x1b[0m`);
-    } 
+    }
     else if (res && res.startsWith("temp_")) {
         const parts = res.split("_");
         const time = parts[1];
-        const reason = parts[2] || "No reason provided"; 
+        const reason = parts[2] || "No reason provided";
         console.log(`\n\x1b[31mBanned for ${formatBanTime(time)}.\x1b[0m`);
         console.log(`\x1b[31mReason: ${reason}\x1b[0m`);
-    } 
+    }
     else if (res === "-1") {
         console.log("\n\x1b[31mFailed: Request rejected by server.\x1b[0m");
-    } 
+    }
     else {
         console.log(`\n\x1b[32mPosted! ID: ${res}\x1b[0m`);
     }
@@ -413,7 +413,7 @@ async function readFriendRequests(user) {
     const res = await network.makeRequest('getGJFriendRequests20.php', {
         accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common, page: page, getSent: choice
     }, DEBUG)
-    
+
     if (res === "-2") {
         console.log("\x1b[31mNo friend requests found.\x1b[0m");
         await question("[Press Enter]");
@@ -451,7 +451,7 @@ async function readFriendRequests(user) {
                 accountID: user.accountID, targetAccountID: target, gjp2: user.gjp2, secret: network.SECRETS.common
             }, DEBUG);
             console.log(res2 !== "-1" ? "\x1b[32mAccepted!\x1b[0m" : "\x1b[31mFailed.\x1b[0m");
-        } 
+        }
         else if (action === "R") {
             let target = await question("Enter Account ID: ");
             const res2 = await network.makeRequest('deleteGJFriendRequests20.php', {
@@ -493,7 +493,7 @@ async function sendFriendRequest(user) {
         await question("[Press Enter]");
     } else {
         const parsedUser = utils.parseUser(res);
-        if(!parsedUser || !parsedUser.accountID) {
+        if (!parsedUser || !parsedUser.accountID) {
             console.log("\x1b[31mFailed to parse user data.\x1b[0m");
             await question("[Press Enter]");
             return;
@@ -532,7 +532,7 @@ async function checkUsers(user) {
         const user = `\x1b[1;36m${u.username.padEnd(16)}\x1b[0m`;
         console.log(`${id} ${user}`);
     });
-    
+
     if (selection == "0") {
         const choice = (await question("Do you want to (U)nfriend or (L)eave: ")).trim().toUpperCase();
 
@@ -589,7 +589,7 @@ async function readMessages(user) {
         const u = `\x1b[1;36m${m.userName.padEnd(16)}\x1b[0m`;
         const n = (!m.isRead && selection === "0") ? `\x1b[32m(NEW!)\x1b[0m`.padEnd(14) : "".padEnd(6);
         const ageText = `${m.age} ago`;
-            console.log(`${id} ${u} ${ageText} ${n} : ${m.subject} \x1b[90m(Message ID: #${m.messageID})\x1b[0m`);
+        console.log(`${id} ${u} ${ageText} ${n} : ${m.subject} \x1b[90m(Message ID: #${m.messageID})\x1b[0m`);
     });
 
     const choice = (await question("(R)ead Full Content or (L)eave: ")).trim().toUpperCase();
@@ -606,19 +606,19 @@ async function readMessages(user) {
 
             const parsed2 = utils.parseMessages(res2);
             parsed2.forEach(m2 => {
-            const divider = "\x1b[90m" + "─".repeat(50) + "\x1b[0m";
-            const id = `\x1b[90mID: #${m2.accountID}\x1b[0m`;
-            const usr = `\x1b[1;36m${m2.userName}\x1b[0m`;
-            const subject = `\x1b[1;37mSubject: ${m2.subject}\x1b[0m`;
-            
-            console.log(`\n${divider}`);
-            console.log(`${usr} ${' '.repeat(Math.max(2, 30 - m2.userName.length))} ${id}`);
-            console.log(`${subject}`);
-            console.log(`${divider}`);
-            console.log(`\n${m2.body}`);
-            console.log(`\n${divider}\n`);
-        });
-        await question("[Press Enter]");
+                const divider = "\x1b[90m" + "─".repeat(50) + "\x1b[0m";
+                const id = `\x1b[90mID: #${m2.accountID}\x1b[0m`;
+                const usr = `\x1b[1;36m${m2.userName}\x1b[0m`;
+                const subject = `\x1b[1;37mSubject: ${m2.subject}\x1b[0m`;
+
+                console.log(`\n${divider}`);
+                console.log(`${usr} ${' '.repeat(Math.max(2, 30 - m2.userName.length))} ${id}`);
+                console.log(`${subject}`);
+                console.log(`${divider}`);
+                console.log(`\n${m2.body}`);
+                console.log(`\n${divider}\n`);
+            });
+            await question("[Press Enter]");
         } else {
             const res2 = await network.makeRequest('downloadGJMessage20.php', {
                 accountID: user.accountID, gjp2: user.gjp2, messageID: messageId, secret: network.SECRETS.common, isSender: 1
@@ -627,19 +627,19 @@ async function readMessages(user) {
 
             const parsed2 = utils.parseMessages(res2);
             parsed2.forEach(m2 => {
-            const divider = "\x1b[90m" + "─".repeat(50) + "\x1b[0m";
-            const id = `\x1b[90mID: #${m2.accountID}\x1b[0m`;
-            const usr = `\x1b[1;36m${m2.userName}\x1b[0m`;
-            const subject = `\x1b[1;37mSubject: ${m2.subject}\x1b[0m`;
-            
-            console.log(`\n${divider}`);
-            console.log(`${usr} ${' '.repeat(Math.max(2, 30 - m2.userName.length))} ${id}`);
-            console.log(`${subject}`);
-            console.log(`${divider}`);
-            console.log(`\n${m2.body}`);
-            console.log(`\n${divider}\n`);
-        });
-        await question("[Press Enter]");
+                const divider = "\x1b[90m" + "─".repeat(50) + "\x1b[0m";
+                const id = `\x1b[90mID: #${m2.accountID}\x1b[0m`;
+                const usr = `\x1b[1;36m${m2.userName}\x1b[0m`;
+                const subject = `\x1b[1;37mSubject: ${m2.subject}\x1b[0m`;
+
+                console.log(`\n${divider}`);
+                console.log(`${usr} ${' '.repeat(Math.max(2, 30 - m2.userName.length))} ${id}`);
+                console.log(`${subject}`);
+                console.log(`${divider}`);
+                console.log(`\n${m2.body}`);
+                console.log(`\n${divider}\n`);
+            });
+            await question("[Press Enter]");
         }
     }
     if (choice == "L") return;
@@ -650,39 +650,39 @@ async function sendMessage(user) {
 
     const uname = (await question("Enter Username (type 'cancel' to leave): ")).trim();
     if (uname.toLowerCase() == "cancel") return;
-    if (!uname) { 
-        console.log("\x1b[31mInvalid Username!"); 
-        await question("[Press Enter]"); 
-        return readMessages(user); 
+    if (!uname) {
+        console.log("\x1b[31mInvalid Username!");
+        await question("[Press Enter]");
+        return readMessages(user);
     }
 
     const subj = await question("Subject: ");
     const msg = await question("Body: ");
     const key = "14251";
     let xorBody = "";
-    
+
     for (let i = 0; i < msg.length; i++) {
         xorBody += String.fromCharCode(msg.charCodeAt(i) ^ key.charCodeAt(i % key.length));
     }
 
     const res = await network.makeRequest('getGJUsers20.php', {
-        secret: network.SECRETS.common, 
+        secret: network.SECRETS.common,
         str: uname
     }, DEBUG);
 
-    if (res == "-1") { 
-        console.log("\x1b[31mUsername not found or server refused request.\x1b[0m"); 
-        await question("[Press Enter]"); 
-        return; 
+    if (res == "-1") {
+        console.log("\x1b[31mUsername not found or server refused request.\x1b[0m");
+        await question("[Press Enter]");
+        return;
     }
 
     const parsed = utils.parseUser(res);
 
     const res2 = await network.makeRequest('uploadGJMessage20.php', {
-        accountID: user.accountID, 
-        gjp2: user.gjp2, 
-        toAccountID: parsed.accountID, 
-        subject: utils.base64Encode(subj), 
+        accountID: user.accountID,
+        gjp2: user.gjp2,
+        toAccountID: parsed.accountID,
+        subject: utils.base64Encode(subj),
         body: utils.base64Encode(xorBody),
         secret: network.SECRETS.common
     }, DEBUG);
@@ -692,11 +692,69 @@ async function sendMessage(user) {
     await new Promise(r => setTimeout(r, 1200));
 }
 
+
+async function lookupUser(user) {
+    scene("User Lookup");
+    const userName = (await question("Username (type 'cancel' to leave): ")).trim().toLowerCase();
+    if (userName == 'cancel') return;
+    if (!userName) { console.log("\x1b[31mInvalid Username!\x1b[0m"); await question("[Press Enter]"); return lookupUser(user); };
+
+    const res1 = await network.makeRequest('getGJUsers20.php', { secret: network.SECRETS.common, str: userName }, DEBUG);
+    if (!res1 || res1 === "-1") {
+        console.log("\x1b[31mUser not found or server refused request.\x1b[0m");
+        await new Promise(r => setTimeout(r, 1500));
+        return;
+    }
+    const parsed1 = utils.parseUser(res1);
+    const res = await network.makeRequest('getGJUserInfo20.php', {
+        targetAccountID: parsed1.accountID, secret: network.SECRETS.common
+    }, DEBUG);
+
+    const parsed = utils.parseUser(res);
+    if (!parsed) {
+        console.log("\x1b[31mFailed to parse user data.\x1b[0m");
+        await new Promise(r => setTimeout(r, 1500));
+        return;
+    }
+
+    const divider = "\x1b[90m" + "─".repeat(56) + "\x1b[0m";
+    console.log(`\n${divider}`);
+    console.log(`\x1b[1;36mUsername:\x1b[0m ${parsed.username}`);
+    console.log(`\x1b[1;36mAccount ID:\x1b[0m ${parsed.accountID}`);
+    console.log(`\x1b[1;36mPlayer ID:\x1b[0m ${parsed.userID || 'N/A'}`);
+    if (parseInt(parsed.stars) > 500) {
+        console.log(`\x1b[1;36mGlobal Rank:\x1b[0m ${utils.formatNumber(parsed.globalRank) || "N/A"}`);
+    }
+    const modLabel = parsed.modLevel === 2 ? 'Elder' : parsed.modLevel === 1 ? 'Moderator' : 'None';
+    if (parsed.modLevel > 0) console.log(`\x1b[1;36mModerator Level:\x1b[0m ${modLabel}`);
+    console.log(`${divider}`);
+    const stats = [];
+    stats.push(`Stars: ${utils.formatNumber(parsed.stars)}`);
+    stats.push(`Demons: ${utils.formatNumber(parsed.demons)}`);
+    if (parseInt(parsed.creatorPoints) > 0) stats.push(`Creator Points: ${utils.formatNumber(parsed.creatorPoints)}`);
+    console.log(`\x1b[1;33mStats:\x1b[0m   ${stats.join('   ')}`);
+    console.log(`\x1b[1;33m         \x1b[0m   Diamonds: ${utils.formatNumber(parsed.diamonds)}   Moons: ${utils.formatNumber(parsed.moons)}`);
+    console.log(`${divider}`);
+
+    const s = parsed.socials || {};
+    if (s.youtube || s.twitter || s.twitch || s.discord || s.instagram) {
+        console.log(`\x1b[1;33mSocials:\x1b[0m`);
+        if (s.youtube) console.log(`  YouTube: youtube.com/channel/${s.youtube}`);
+        if (s.twitter) console.log(`  Twitter: ${s.twitter}`);
+        if (s.twitch) console.log(`  Twitch: ${s.twitch}`);
+        if (s.discord) console.log(`  Discord: ${s.discord}`);
+        if (s.instagram) console.log(`  Instagram: ${s.instagram}`);
+        console.log(divider);
+    }
+
+    await question("[Press Enter]");
+}
+
 /** ---------------- LEVELS ---------------- **/
 
 async function checkDaily(user) {
     scene("Daily/Weekly Lookup");
-    
+
     let mode = (await question("(D)aily or (W)eekly level (type 'cancel' to leave): ")).trim().toUpperCase();
     if (mode.toLowerCase() == "cancel") return;
 
@@ -752,7 +810,7 @@ async function checkDaily(user) {
     }
 
     console.log(`\n\x1b[1;32mThe ${label} level is ${level.name}, ID ${level.id}. It awards you ${level.stats.stars} stars. The ${label} level changes in ${formatBanTime(timeLeft)}\x1b[0m`);
-    
+
     await question("\n[Press Enter]");
 }
 
@@ -772,7 +830,7 @@ async function logout() {
 
 async function mainMenu(user) {
     if (!user) return startFlow();
-    
+
     while (true) {
         process.title = `GDasher | ${user.username}`;
         scene(`Welcome, ${user.username} - v${VERSION}`);
@@ -783,7 +841,8 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`);
         console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`);
         console.log(` \x1b[1;36m[11]\x1b[0m Read Messages          \x1b[1;36m[12]\x1b[0m Send a Message`);
-        console.log(` \x1b[1;31m[13]\x1b[0m Logout & Exit          \x1b[1;31m[14]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[13]\x1b[0m Check user`);
+        console.log(` \x1b[1;31m[14]\x1b[0m Logout & Exit          \x1b[1;31m[15]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
 
@@ -799,8 +858,9 @@ async function mainMenu(user) {
         else if (choice === '10') await checkDaily(user);
         else if (choice === '11') await readMessages(user);
         else if (choice === '12') await sendMessage(user);
-        else if (choice === '13') { await logout(); break; }
-        else if (choice === '14') process.exit();
+        else if (choice === '13') await lookupUser(user);
+        else if (choice === '14') { await logout(); break; }
+        else if (choice === '15') process.exit();
     }
 }
 

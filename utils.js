@@ -74,6 +74,15 @@ module.exports = {
         });
     },
 
+    formatNumber: (num) => {
+        if (num === null || num === undefined) return "0";
+
+        const n = Number(num);
+        if (isNaN(n)) return "0";
+
+        return n.toLocaleString('en-US');
+    },
+
     parseUser: (rawResponse) => {
         if (!rawResponse || rawResponse === "-1") return null;
 
@@ -99,7 +108,7 @@ module.exports = {
             globalRank: data['30'] || null,
             registered: data['29'] === '1',
             modLevel: parseInt(data['49']) || 0, // 0: None, 1: Mod, 2: Elder
-            
+
             socials: {
                 youtube: data['20'] || null,
                 twitter: data['44'] || null,
@@ -115,7 +124,7 @@ module.exports = {
      */
     parseUserSearch: (rawResponse) => {
         if (!rawResponse || rawResponse === "-1") return [];
-        
+
         const userSegments = rawResponse.split('#')[0].split('|');
         return userSegments.map(seg => module.exports.parseUser(seg)).filter(u => u !== null);
     },
@@ -124,15 +133,15 @@ module.exports = {
         if (!rawResponse || rawResponse === "-1" || !rawResponse.includes('~')) return [];
         const mainData = rawResponse.split('#')[0];
         const commentSegments = mainData.split('|');
-        
+
         return commentSegments.map(c => {
             const parts = c.split(':');
             const commentPart = parts[0].split('~');
             const userPart = parts[1] ? parts[1].split('~') : [];
             const obj = {};
-            
-            for (let i = 0; i < commentPart.length; i += 2) { if (commentPart[i+1]) obj[commentPart[i]] = commentPart[i + 1]; }
-            for (let i = 0; i < userPart.length; i += 2) { if (userPart[i+1]) obj["u" + userPart[i]] = userPart[i + 1]; }
+
+            for (let i = 0; i < commentPart.length; i += 2) { if (commentPart[i + 1]) obj[commentPart[i]] = commentPart[i + 1]; }
+            for (let i = 0; i < userPart.length; i += 2) { if (userPart[i + 1]) obj["u" + userPart[i]] = userPart[i + 1]; }
 
             let content = "";
             if (obj['2']) {
@@ -141,7 +150,7 @@ module.exports = {
                     content = Buffer.from(b64, 'base64').toString('utf8').trim();
                 } catch (e) { content = "[Decode Error]"; }
             }
-            
+
             return {
                 userName: obj["u1"] || "Unknown",
                 commentID: obj['6'] || "0",
@@ -239,7 +248,7 @@ module.exports = {
                 isDemon: data['17'] === '1',
                 isAuto: data['25'] === '1',
                 demonDifficulty: parseInt(data['43']) || 0,
-                epicType: parseInt(data['42']) || 0 
+                epicType: parseInt(data['42']) || 0
             },
             stats: {
                 downloads: parseInt(data['10']),
@@ -262,7 +271,7 @@ module.exports = {
                 editorTime: parseInt(data['46']) || 0,
                 dailyNumber: parseInt(data['41']) || 0
             },
-            levelString: data['4'] || null 
+            levelString: data['4'] || null
         };
     },
 

@@ -33,19 +33,19 @@ async function makeRequest(endpoint, params, debug = false) {
             res.on('end', () => resolve(data));
         });
 
-            // additionally log the response body when debug mode is enabled
-            if (debug) {
-                req.on('response', (resStream) => {
-                    let respData = '';
-                    resStream.on('data', c => respData += c);
-                    resStream.on('end', () => {
-                        console.log(`\n\x1b[1;36m[NETWORK ${endpoint} RESPONSE]\x1b[0m`);
-                        try { console.log(respData); } catch (e) { console.log(String(respData)); }
-                    });
+        // additionally log the response body when debug mode is enabled
+        if (debug) {
+            req.on('response', (resStream) => {
+                let respData = '';
+                resStream.on('data', c => respData += c);
+                resStream.on('end', () => {
+                    console.log(`\n\x1b[1;36m[NETWORK ${endpoint} RESPONSE]\x1b[0m`);
+                    try { console.log(respData); } catch (e) { console.log(String(respData)); }
                 });
-            }
+            });
+        }
 
-            req.on('error', (err) => {
+        req.on('error', (err) => {
             console.error("Network Error:", err.message);
             resolve("-1");
         });

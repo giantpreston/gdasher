@@ -126,10 +126,10 @@ node index.js
 GDasher directly interfaces directly with Geometry Dash's internal API endpoints, without any other servers in the middle:
 
 ```
-┌─────────────┐     HTTP POST     ┌─────────────────┐
+┌─────────────┐     HTTP POST     ┌──────────────────┐
 │  GDasher    │ ────────────────▶ │  Geometry Dash  │
 │  (Terminal) │ ◀──────────────── │  API Servers    │
-└─────────────┘     Plaintext     └─────────────────┘
+└─────────────┘     Plaintext     └──────────────────┘
 ```
 
 **Security:** 

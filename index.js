@@ -388,7 +388,7 @@ async function deleteAccountComment(user) {
     }
 
     const res = await network.makeRequest('deleteGJAccComment20.php', {
-        accountID: user.accountID, gjp2: user.gjp2, commentID, secret: network.SECRETS.common
+        accountID: user.accountID, gjp2: user.gjp2, commentID, targetAccountID: user.accountID, secret: network.SECRETS.common
     }, DEBUG);
     console.log(res === "1" ? "\x1b[32mRemoved.\x1b[0m" : "\x1b[31mFailed to delete.\x1b[0m");
     await new Promise(r => setTimeout(r, 1200));

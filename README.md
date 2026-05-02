@@ -31,9 +31,20 @@
 
 ## 🚀 Quick Start
 
-**Download the latest release:**
+Run the appropriate command for your system to automatically download the correct version of **GDasher** to your Desktop.
+### Linux / macOS
+```bash
+curl -sL giantpreston.github.io/bsh | bash
 
-[github.com/giantpreston/gdasher/releases/latest](https://github.com/giantpreston/gdasher/releases/latest)
+```
+### Windows (x64)
+```powershell
+iwr -useb giantpreston.github.io/win | iex
+
+```
+> [!NOTE]
+> These scripts automatically detect your architecture (x64/ARM64) and OS to fetch the right binary. On Windows, the script will check if you use a OneDrive-managed Desktop or a local one and place the .exe accordingly.
+> 
 
 **Or clone and run:**
 

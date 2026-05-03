@@ -4,7 +4,7 @@ const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 
-const VERSION = "0.1.5";
+const VERSION = "0.1.6";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -707,7 +707,7 @@ async function lookupUser(user) {
     }
     const parsed1 = utils.parseUser(res1);
     const res = await network.makeRequest('getGJUserInfo20.php', {
-        targetAccountID: parsed1.accountID, secret: network.SECRETS.common
+        targetAccountID: parsed1.accountID, gameVersion: 22, gameBinary: 47, secret: network.SECRETS.common // apparently if gameversion isnt 22, it wont return 3 for leaderboard moderators. god bless robtop.
     }, DEBUG);
 
     const parsed = utils.parseUser(res);
@@ -725,7 +725,7 @@ async function lookupUser(user) {
     if (parseInt(parsed.stars) > 500) {
         console.log(`\x1b[1;36mGlobal Rank:\x1b[0m ${utils.formatNumber(parsed.globalRank) || "N/A"}`);
     }
-    const modLabel = parsed.modLevel === 2 ? 'Elder' : parsed.modLevel === 1 ? 'Moderator' : 'None';
+    const modLabel = parsed.modLevel === 2 ? 'Elder' : parsed.modLevel === 1 ? 'Moderator' : parsed.modLevel === 3 ? 'Leaderboard' : 'None';
     if (parsed.modLevel > 0) console.log(`\x1b[1;36mModerator Level:\x1b[0m ${modLabel}`);
     console.log(`${divider}`);
     const stats = [];
@@ -740,12 +740,14 @@ async function lookupUser(user) {
 
     const s = parsed.socials || {};
     if (s.youtube || s.twitter || s.twitch || s.discord || s.instagram) {
+        let youtubevalue;
         console.log(`\x1b[1;33mSocials:\x1b[0m`);
-        if (s.youtube) console.log(`  YouTube: youtube.com/channel/${s.youtube}`);
-        if (s.twitter) console.log(`  Twitter: ${s.twitter}`);
-        if (s.twitch) console.log(`  Twitch: ${s.twitch}`);
-        if (s.discord) console.log(`  Discord: ${s.discord}`);
-        if (s.instagram) console.log(`  Instagram: ${s.instagram}`);
+        if (s.youtube.startsWith("UC") && s.youtube.length === 24) { youtubevalue = `https://youtube.com/channel/${s.youtube}` } else { youtubevalue = `https://youtube.com/@${s.youtube}` }
+        if (s.youtube) console.log(`  YouTube: ${youtubevalue}`);
+        if (s.twitter) console.log(`  Twitter: https://x.com/${s.twitter}`);
+        if (s.twitch) console.log(`  Twitch: https://twitch.tv/${s.twitch}`);
+        if (s.discord) console.log(`  Discord: @${s.discord}`);
+        if (s.instagram) console.log(`  Instagram: @${s.instagram}`);
         console.log(divider);
     }
     console.log('\x1b[1;33mSocial Settings:\x1b[0m');

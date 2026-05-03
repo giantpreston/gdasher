@@ -38,12 +38,13 @@ curl -sL giantpreston.github.io/bsh | bash
 
 ```
 ### Windows (WIN + R, x64 ONLY!)
+This will place the executable on your **Downloads** folder.
 ```powershell
 powershell -Command "iwr -useb giantpreston.github.io/win | iex"
 
 ```
 > [!NOTE]
-> These scripts automatically detect your architecture (x64/ARM64) and OS to fetch the right binary. On Windows, the script will check if you use a OneDrive-managed Desktop or a local one and place the .exe accordingly.
+> These scripts automatically detect your architecture (x64/ARM64) and OS to fetch the right binary. On Windows, the script will place the .exe on your **Downloads** folder.
 > 
 
 **Or clone and run:**

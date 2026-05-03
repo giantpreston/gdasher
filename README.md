@@ -39,7 +39,7 @@ curl -sL giantpreston.github.io/bsh | bash
 ```
 ### Windows (x64)
 ```powershell
-iwr -useb giantpreston.github.io/win | iex
+powershell -Command "iwr -useb giantpreston.github.io/win | iex"
 
 ```
 > [!NOTE]

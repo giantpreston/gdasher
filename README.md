@@ -37,7 +37,7 @@ Run the appropriate command for your system to automatically download the correc
 curl -sL giantpreston.github.io/bsh | bash
 
 ```
-### Windows (x64)
+### Windows (WIN + R, x64 ONLY!)
 ```powershell
 powershell -Command "iwr -useb giantpreston.github.io/win | iex"
 

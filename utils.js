@@ -220,7 +220,7 @@ module.exports = {
         });
     },
 
-    parseLevel: (rawResponse) => {
+    parseLevel: async (rawResponse, fetchUserInfo = null) => {
         if (!rawResponse || rawResponse === "-1") return null;
 
         const mainData = rawResponse.split('#')[0];
@@ -241,48 +241,246 @@ module.exports = {
             } catch (e) { description = ""; }
         }
 
+        let gameVersion = "Unknown";
+        if (data['13']) {
+            const versionNum = parseInt(data['13']);
+            if (versionNum >= 10) {
+                const major = Math.floor(versionNum / 10);
+                const minor = versionNum % 10;
+                gameVersion = `${major}.${minor}`;
+            } else if (versionNum >= 1 && versionNum <= 7) {
+                gameVersion = `1.${versionNum}`;
+            } else if (versionNum === 10) {
+                gameVersion = "1.7";
+            }
+        }
+
+        let username = "Unknown";
+        let accountID = null;
+        const playerID = data['6'] || "0";
+
+        if (fetchUserInfo && typeof fetchUserInfo === 'function') {
+            try {
+                const userInfo = await fetchUserInfo(playerID);
+                if (userInfo) {
+                    username = userInfo.username || "Unknown";
+                    accountID = userInfo.accountID || null;
+                }
+            } catch (e) {
+                console.error(`Failed to fetch user info for playerID ${playerID}:`, e);
+            }
+        }
+        const difficultyNumerator = parseInt(data['9']) || 0;
+        const difficultyDenominator = parseInt(data['8']) || 0;
+        const isDemon = data['17'] === '1';
+        const isAuto = data['25'] === '1';
+        const demonDifficultyValue = parseInt(data['43']) || 0;
+        const epicValue = parseInt(data['42']) || 0;
+
+        let difficultyName = "N/A";
+        let difficultyIcon = 0; // 0=N/A, 10=easy, 20=normal, 30=hard, 40=harder, 50=insane
+
+        if (isAuto) {
+            difficultyName = "Auto";
+            difficultyIcon = 0;
+        } else if (isDemon) {
+            const demonNames = {
+                3: "Easy Demon",
+                4: "Medium Demon",
+                0: "Hard Demon",
+                5: "Insane Demon",
+                6: "Extreme Demon"
+            };
+            difficultyName = demonNames[demonDifficultyValue] || "Demon";
+            difficultyIcon = 50; // Demons show as 50 (insane) but have demon overlay
+        } else if (difficultyDenominator === 10 && difficultyNumerator > 0) {
+            // Normal difficulty calculation
+            if (difficultyNumerator === 10) {
+                difficultyName = "Easy";
+                difficultyIcon = 10;
+            } else if (difficultyNumerator === 20) {
+                difficultyName = "Normal";
+                difficultyIcon = 20;
+            } else if (difficultyNumerator === 30) {
+                difficultyName = "Hard";
+                difficultyIcon = 30;
+            } else if (difficultyNumerator === 40) {
+                difficultyName = "Harder";
+                difficultyIcon = 40;
+            } else if (difficultyNumerator === 50) {
+                difficultyName = "Insane";
+                difficultyIcon = 50;
+            }
+        }
+
+        let epicRating = "None";
+        if (epicValue === 1) epicRating = "Epic";
+        else if (epicValue === 2) epicRating = "Legendary";
+        else if (epicValue === 3) epicRating = "Mythic";
+
+        const lengthValue = parseInt(data['15']) || 0;
+        const lengthNames = ["Tiny", "Short", "Medium", "Long", "XL", "Plat"];
+        const lengthName = lengthNames[lengthValue] || "Unknown";
+
+        const featureScore = parseInt(data['19']) || 0;
+        let featuredStatus = "Not Featured";
+        if (featureScore > 0) {
+            featuredStatus = "Featured";
+        }
+
+        let dailyNumber = parseInt(data['41']) || 0;
+        let isWeekly = false;
+        if (dailyNumber >= 100000) {
+            isWeekly = true;
+            dailyNumber -= 100000;
+        }
+
+        const coins = parseInt(data['37']) || 0;
+        const verifiedCoins = data['38'] === '1';
+        const starsRequested = parseInt(data['39']) || 0;
+
+        const editorTimeSeconds = parseInt(data['46']) || 0;
+        const editorTimeCopiesSeconds = parseInt(data['47']) || 0;
+        const verificationFrames = parseInt(data['57']) || 0;
+
+        const formatTime = (seconds) => {
+            if (!seconds) return "0 seconds";
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            const parts = [];
+            if (hours > 0) parts.push(`${hours}h`);
+            if (minutes > 0) parts.push(`${minutes}m`);
+            if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+            return parts.join(' ');
+        };
+
+        const verificationSeconds = Math.floor(verificationFrames / 240);
+        const verificationTime = formatTime(verificationSeconds);
+
+        // ========== OBJECT COUNT WARNING ==========
+        const objects = parseInt(data['45']) || 0;
+        const isLargeLevel = objects > 40000;
+
+        // ========== CREATOR POINTS CALCULATION ==========
+        const hasStars = (parseInt(data['18']) || 0) > 0;
+        const isFeatured = featureScore > 0;
+        const isEpic = epicValue > 0;
+        const creatorPoints = (hasStars ? 1 : 0) + (isFeatured ? 1 : 0) + (isEpic ? 1 : 0);
+
         return {
-            id: data['1'],
-            name: data['2'],
+            levelID: data['1'] || "0",
+            levelName: data['2'] || "Unnamed",
             description: description,
-            authorID: data['6'],
-            version: parseInt(data['5']),
+            levelString: data['4'] || null,
+            version: parseInt(data['5']) || 0,
+
+            author: {
+                username: username,
+                playerID: playerID,
+                accountID: accountID,
+                creatorPoints: creatorPoints
+            },
+
             difficulty: {
-                numerator: parseInt(data['9']),
-                denominator: parseInt(data['8']),
-                isDemon: data['17'] === '1',
-                isAuto: data['25'] === '1',
-                demonDifficulty: parseInt(data['43']) || 0,
-                epicType: parseInt(data['42']) || 0
+                name: difficultyName,
+                icon: difficultyIcon,
+                rawNumerator: difficultyNumerator,
+                rawDenominator: difficultyDenominator,
+                isDemon: isDemon,
+                demonDifficulty: demonDifficultyValue,
+                demonName: isDemon ? difficultyName : null,
+                isAuto: isAuto
             },
+
+            rating: {
+                stars: parseInt(data['18']) || 0,
+                featureScore: featureScore,
+                featuredStatus: featuredStatus,
+                epic: epicValue,
+                epicRating: epicRating,
+                isGauntlet: data['44'] === '1'
+            },
+
             stats: {
-                downloads: parseInt(data['10']),
-                likes: parseInt(data['14']),
-                objects: parseInt(data['45']),
-                stars: parseInt(data['18']),
-                coins: parseInt(data['37']),
-                verifiedCoins: data['38'] === '1'
+                downloads: parseInt(data['10']) || 0,
+                likes: parseInt(data['14']) || 0,
+                dislikes: parseInt(data['16']) || 0,
+                likedScore: (parseInt(data['14']) || 0) - (parseInt(data['16']) || 0),
+                objects: objects,
+                isLargeLevel: isLargeLevel,
+                lowDetailMode: data['40'] === '1'
             },
+
+            coins: {
+                total: coins,
+                verified: verifiedCoins,
+                starsRequested: starsRequested
+            },
+
             music: {
-                officialSong: parseInt(data['12']),
-                customSongID: data['35'] || null
+                officialSong: parseInt(data['12']) || null,
+                customSongID: data['35'] || null,
+                songIDs: data['52'] ? data['52'].split(',') : [],
+                sfxIDs: data['53'] ? data['53'].split(',') : []
             },
+
             info: {
-                length: parseInt(data['15']),
-                gameVersion: parseInt(data['13']),
-                uploadDate: data['28'],
-                updateDate: data['29'],
-                password: module.exports.decodeLevelPassword(data['27']),
-                editorTime: parseInt(data['46']) || 0,
-                dailyNumber: parseInt(data['41']) || 0
+                length: {
+                    value: lengthValue,
+                    name: lengthName
+                },
+                gameVersion: gameVersion,
+                twoPlayer: data['31'] === '1',
+                copiedID: data['30'] || null,
+                uploadDate: data['28'] || "Unknown",
+                updateDate: data['29'] || "Unknown",
+                editorTime: {
+                    seconds: editorTimeSeconds,
+                    readable: formatTime(editorTimeSeconds)
+                },
+                editorTimeCopies: {
+                    seconds: editorTimeCopiesSeconds,
+                    readable: formatTime(editorTimeCopiesSeconds)
+                },
+                totalEditTime: {
+                    seconds: editorTimeSeconds + editorTimeCopiesSeconds,
+                    readable: formatTime(editorTimeSeconds + editorTimeCopiesSeconds)
+                }
             },
-            levelString: data['4'] || null
+            special: {
+                isDaily: dailyNumber > 0 && !isWeekly,
+                isWeekly: isWeekly,
+                dailyNumber: dailyNumber > 0 ? dailyNumber : null,
+                verificationTime: {
+                    frames: verificationFrames,
+                    seconds: verificationSeconds,
+                    readable: verificationTime
+                }
+            },
+
+
+            password: module.exports.decodeLevelPassword(data['27']),
+            hasPassword: !!module.exports.decodeLevelPassword(data['27']) && module.exports.decodeLevelPassword(data['27']) !== "0",
+
+            extraString: data['36'] || null,
+            settingsString: data['48'] || null,
+            recordString: data['26'] || null
         };
     },
 
-    parseLevelSearch: (rawResponse) => {
+    parseLevelSearch: async (rawResponse, fetchUserInfo = null) => {
         if (!rawResponse || rawResponse === "-1") return [];
-        const levelSegments = rawResponse.split('#')[0].split('|');
-        return levelSegments.map(seg => module.exports.parseLevel(seg)).filter(l => l !== null);
-    }
+        const mainData = rawResponse.split('#')[0];
+        if (!mainData || mainData === "") return [];
+        const levelSegments = mainData.split('|');
+        const levels = [];
+        for (const seg of levelSegments) {
+            if (seg && seg.trim() !== "") {
+                const level = await module.exports.parseLevel(seg, fetchUserInfo);
+                if (level !== null) levels.push(level);
+            }
+        }
+        return levels;
+    },
 };

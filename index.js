@@ -3,8 +3,9 @@ const readline = require('readline');
 const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
+const enums = require('./enums')
 
-const VERSION = "0.1.6";
+const VERSION = "0.1.7";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -812,7 +813,10 @@ async function checkDaily(user) {
         return;
     }
 
-    const parsedLevels = utils.parseLevelSearch(levelRes);
+    const parsedLevels = await utils.parseLevelSearch(levelRes, async (playerID) => {
+        const res = await network.makeRequest('getGJUsers20.php', { str: playerID, secret: network.SECRETS.common }, DEBUG);
+        return utils.parseUser(res);
+    });
     const level = parsedLevels[0];
 
     if (!level) {
@@ -821,9 +825,488 @@ async function checkDaily(user) {
         return;
     }
 
-    console.log(`\n\x1b[1;32mThe ${label} level is ${level.name}, ID ${level.id}. It awards you ${level.stats.stars} stars. The ${label} level changes in ${formatBanTime(timeLeft)}\x1b[0m`);
+    console.log(`\n\x1b[1;32mThe ${label} level is ${level.levelName} by ${level.author.username || 'Unknown'}, ID ${level.levelID}. It awards you ${level.rating.stars} stars. The ${label} level changes in ${formatBanTime(timeLeft)}\x1b[0m`);
 
     await question("\n[Press Enter]");
+}
+
+async function levelSearch(user) {
+    scene("Level Search");
+
+    // Build filter object
+    const filters = {};
+
+    console.log("\x1b[1;33m=== Search Filters (leave blank for default) ===\x1b[0m\n");
+
+    // Search query (for type 0)
+    const query = await question("Search query (name or user ID): ");
+    if (query && query.toLowerCase() !== "cancel") {
+        filters.str = query;
+    } else if (query && query.toLowerCase() === "cancel") {
+        return;
+    }
+
+    // Search type
+    if (!query) {
+        console.log("\n\x1b[1;36mSearch Types:\x1b[0m");
+        console.log("        1 - Most downloaded");
+        console.log(" 2 - Most liked        3 - Trending");
+        console.log(" 4 - Recent            5 - User's levels");
+        console.log(" 6 - Featured          7 - Magic");
+        console.log(" 8 - Mod sent          10 - Level list");
+        console.log(" 11 - Awarded          12 - Followed");
+        console.log(" 13 - Friends          21 - Daily history");
+        console.log(" 22 - Weekly history");
+
+        let type = await question("\nType (default 2): ");
+        filters.type = (type && type !== "") ? parseInt(type) : 2;
+    } else { filters.type = 0 }
+    // Difficulty filter
+    console.log("\n\x1b[1;36mDifficulty Filters (comma separated):\x1b[0m");
+    console.log(" -2 - Demons     1 - Easy     2 - Normal");
+    console.log(" 3 - Hard        4 - Harder   5 - Insane");
+    const diff = await question("Difficulties (e.g., '1,3,5'): ");
+    if (diff && diff !== "") {
+        filters.diff = diff;
+    } else {
+        filters.diff = "-";
+    }
+
+    // Demon filter
+    if (filters.diff && filters.diff.includes('-2')) {
+        console.log("\n\x1b[1;36mDemon Difficulty:\x1b[0m");
+        console.log(" 1 - Easy Demon    2 - Medium Demon");
+        console.log(" 3 - Hard Demon    4 - Insane Demon");
+        console.log(" 5 - Extreme Demon");
+        const demonFilter = await question("Demon difficulty: ");
+        if (demonFilter && demonFilter !== "") {
+            filters.demonFilter = parseInt(demonFilter);
+        }
+    }
+
+    // Length filter
+    console.log("\n\x1b[1;36mLength:\x1b[0m");
+    console.log(" 0 - Tiny     1 - Short     2 - Medium");
+    console.log(" 3 - Long     4 - XL        5 - Platformer");
+    const len = await question("Length (0-5): ");
+    if (len && len !== "") {
+        filters.len = parseInt(len);
+    } else {
+        filters.len = "-";
+    }
+
+    // Rating filters
+    console.log("\n\x1b[1;36mRating Filters:\x1b[0m");
+    const star = await question("Only rated (1=yes, 0=no): ");
+    if (star && star !== "") {
+        filters.star = parseInt(star);
+    } else {
+        filters.star = 0;
+    }
+
+    const noStar = await question("Only unrated (1=yes, 0=no): ");
+    if (noStar && noStar !== "") {
+        filters.noStar = parseInt(noStar);
+    } else {
+        filters.noStar = 0;
+    }
+
+    const featured = await question("Only featured (1=yes): ");
+    if (featured && featured !== "") {
+        filters.featured = parseInt(featured);
+    } else {
+        filters.featured = 0;
+    }
+
+    const epic = await question("Only epic (1=yes): ");
+    if (epic && epic !== "") {
+        filters.epic = parseInt(epic);
+    } else {
+        filters.epic = 0;
+    }
+
+    const original = await question("Only original (1=yes): ");
+    if (original && original !== "") {
+        filters.original = parseInt(original);
+    } else {
+        filters.original = 0;
+    }
+
+    // Completion filters
+    console.log("\n\x1b[1;36mCompletion Filters:\x1b[0m");
+    const uncompleted = await question("Only uncompleted (1=yes): ");
+    if (uncompleted && uncompleted !== "") {
+        filters.uncompleted = parseInt(uncompleted);
+    } else {
+        filters.uncompleted = 0;
+    }
+
+    const onlyCompleted = await question("Only completed (1=yes): ");
+    if (onlyCompleted && onlyCompleted !== "") {
+        filters.onlyCompleted = parseInt(onlyCompleted);
+    } else {
+        filters.onlyCompleted = 0;
+    }
+
+    // Coin filter
+    const coins = await question("Has coins (1=yes): ");
+    if (coins && coins !== "") {
+        filters.coins = parseInt(coins);
+    } else {
+        filters.coins = 0;
+    }
+
+    // Two player filter
+    const twoPlayer = await question("Two player mode (1=yes): ");
+    if (twoPlayer && twoPlayer !== "") {
+        filters.twoPlayer = parseInt(twoPlayer);
+    } else {
+        filters.twoPlayer = 0;
+    }
+
+    // Page
+    let page = await question("\nPage number (default 0): ");
+    if (page === "") page = "0";
+
+    // Account ID for friend/followed searches
+    if (filters.type === 12 || filters.type === 13) {
+        filters.accountID = user.accountID;
+        filters.gjp2 = user.gjp2;
+        if (filters.type === 12 && user.followed) {
+            filters.followed = user.followed;
+        }
+    }
+
+    // Add required parameters
+    filters.secret = network.SECRETS.common;
+    filters.gameVersion = "22";
+    filters.binaryVersion = "47";
+    filters.page = page;
+    filters.total = "0";
+
+    // Remove empty filters
+    Object.keys(filters).forEach(key => {
+        if (filters[key] === undefined || filters[key] === null || filters[key] === "") {
+            delete filters[key];
+        }
+    });
+
+    console.log("\n\x1b[1;33mSearching for levels...\x1b[0m");
+
+    const response = await network.makeRequest('getGJLevels21.php', filters, DEBUG);
+
+    if (!response || response === "-1") {
+        console.log("\x1b[31mNo levels found or search failed.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    // Parse page info
+    let totalLevels = 0;
+    let currentPage = parseInt(page);
+    const [, , , pageInfo] = response.split('#');
+    if (pageInfo) {
+        const [total] = pageInfo.split(':');
+        totalLevels = parseInt(total) || 0;
+    }
+
+    // Display results with pagination
+    let viewing = true;
+    let currentFilters = { ...filters };
+
+    while (viewing) {
+        // Fetch levels for current page
+        currentFilters.page = currentPage.toString();
+
+        const pageResponse = currentPage === parseInt(page) && response !== "-1"
+            ? response
+            : await network.makeRequest('getGJLevels21.php', currentFilters, DEBUG);
+
+        if (!pageResponse || pageResponse === "-1") {
+            console.log("\x1b[31mNo levels found on this page.\x1b[0m");
+            if (currentPage > 0) currentPage--;
+            await question("[Press Enter]");
+            continue;
+        }
+
+        // Parse levels using the existing utils function (resolve creator usernames)
+        const parsedLevels = await utils.parseLevelSearch(pageResponse, async (playerID) => {
+            const res = await network.makeRequest('getGJUsers20.php', { str: playerID, secret: network.SECRETS.common }, DEBUG);
+            return utils.parseUser(res);
+        });
+
+        if (parsedLevels.length === 0) {
+            console.log("\x1b[31mNo levels found.\x1b[0m");
+            await question("[Press Enter]");
+            return;
+        }
+
+        // Convert parsed levels to display format
+        const levels = parsedLevels.map(level => ({
+            levelData: level,
+            levelID: level.levelID,
+            name: level.levelName,
+            creator: level.author.username,
+            stars: level.rating.stars,
+            difficultyIcon: getDifficultyEmoji(level.difficulty),
+            epicIcon: getEpicEmoji(level.rating.epicRating),
+            likes: level.stats.likes,
+            downloads: level.stats.downloads,
+            length: level.info.length.name,
+            coins: level.coins.total,
+            featured: level.rating.featureScore > 0
+        }));
+        function shortenNumber(num, options = {}) {
+            const {
+                decimals = 2,
+                addSpace = false,
+                thousandSuffix = "K",
+                millionSuffix = "M",
+                billionSuffix = "B",
+                trillionSuffix = "T",
+                quadrillionSuffix = "Q"
+            } = options;
+
+            if (num === undefined || num === null) return "0";
+
+            const absNum = Math.abs(num);
+            const sign = num < 0 ? "-" : "";
+            const space = addSpace ? " " : "";
+
+            if (absNum >= 1_000_000_000_000_000) {
+                return sign + (absNum / 1_000_000_000_000_000).toFixed(decimals) + space + quadrillionSuffix;
+            }
+            if (absNum >= 1_000_000_000_000) {
+                return sign + (absNum / 1_000_000_000_000).toFixed(decimals) + space + trillionSuffix;
+            }
+            if (absNum >= 1_000_000_000) {
+                return sign + (absNum / 1_000_000_000).toFixed(decimals) + space + billionSuffix;
+            }
+            if (absNum >= 1_000_000) {
+                return sign + (absNum / 1_000_000).toFixed(decimals) + space + millionSuffix;
+            }
+            if (absNum >= 1_000) {
+                return sign + (absNum / 1_000).toFixed(decimals) + space + thousandSuffix;
+            }
+
+            return sign + absNum.toString();
+        }
+
+        scene(`Level Search Results - Page ${currentPage}${totalLevels > 0 ? ` (${levels.length}/${totalLevels} levels)` : ''}`);
+
+        console.log(`\x1b[1;33mFilters:\x1b[0m`);
+        if (currentFilters.str) console.log(`  Query: "${currentFilters.str}"`);
+        console.log(`  Type: ${currentFilters.type} - ${getSearchTypeName(currentFilters.type)}`);
+        console.log("");
+
+        // Display levels in a table format
+        console.log("\x1b[1;36m┌─────┬──────────────────────────┬─────────────────┬──────────┬──────────┬────────┐\x1b[0m");
+        console.log("\x1b[1;36m│ #   │ Level Name               │ Creator         │ Stars    │ Likes    │ DLs    │\x1b[0m");
+        console.log("\x1b[1;36m├─────┼──────────────────────────┼─────────────────┼──────────┼──────────┼────────┤\x1b[0m");
+
+        levels.forEach((level, idx) => {
+            const num = (idx + 1).toString().padStart(3);
+            let name = level.name.length > 24 ? level.name.substring(0, 21) + "..." : level.name.padEnd(24);
+            let creator = level.creator.length > 15 ? level.creator.substring(0, 12) + "..." : level.creator.padEnd(15);
+            let stars = `${level.difficultyIcon}${level.epicIcon} ${level.stars > 0 ? level.stars : ""}${level.stars > 0 ? "⭐" : ""}`.padEnd(8);
+            let likes = shortenNumber(level.likes).padEnd(8);
+            let downloads = shortenNumber(level.downloads).padEnd(6);
+
+            console.log(`\x1b[1;36m│\x1b[0m ${num} \x1b[1;36m│\x1b[0m ${name} \x1b[1;36m│\x1b[0m ${creator} \x1b[1;36m│\x1b[0m ${stars} \x1b[1;36m│\x1b[0m ${likes} \x1b[1;36m│\x1b[0m ${downloads} \x1b[1;36m│\x1b[0m`);
+        });
+
+        console.log("\x1b[1;36m└─────┴──────────────────────────┴─────────────────┴──────────┴──────────┴────────┘\x1b[0m");
+
+        console.log("\n\x1b[1;33mOptions:\x1b[0m");
+        console.log("  \x1b[1;36m[#]\x1b[0m - View level details (enter level number)");
+        console.log("  \x1b[1;36m[N]\x1b[0m - Next page");
+        console.log("  \x1b[1;36m[P]\x1b[0m - Previous page");
+        console.log("  \x1b[1;36m[R]\x1b[0m - Refine search (new filters)");
+        console.log("  \x1b[1;36m[Q]\x1b[0m - Return to main menu");
+
+        const choice = await question("\n\x1b[1;35mLEVEL SEARCH > \x1b[0m");
+
+        if (choice.toLowerCase() === 'q') {
+            viewing = false;
+        } else if (choice.toLowerCase() === 'n') {
+            currentPage++;
+        } else if (choice.toLowerCase() === 'p') {
+            if (currentPage > 0) {
+                currentPage--;
+            } else {
+                console.log("\x1b[31mAlready on first page.\x1b[0m");
+                await question("[Press Enter]");
+            }
+        } else if (choice.toLowerCase() === 'r') {
+            await levelSearch(user);
+            return;
+        } else {
+            const levelNum = parseInt(choice);
+            if (!isNaN(levelNum) && levelNum >= 1 && levelNum <= levels.length) {
+                await viewLevelDetails(levels[levelNum - 1].levelData, user);
+            } else {
+                console.log("\x1b[31mInvalid choice.\x1b[0m");
+                await question("[Press Enter]");
+            }
+        }
+    }
+}
+
+async function viewLevelDetails(levelData, user) {
+    scene(`Level: ${levelData.levelName}`);
+
+    // Display full level details
+    const divider = "\x1b[90m" + "═".repeat(78) + "\x1b[0m";
+
+    console.log(`\n${divider}`);
+    console.log(`\x1b[1;36m📋 LEVEL INFORMATION\x1b[0m`);
+    console.log(divider);
+
+    // Title and basic info
+    console.log(`\n\x1b[1;33m📝 Name:\x1b[0m ${levelData.levelName}`);
+    console.log(`\x1b[1;33m🔢 Level ID:\x1b[0m ${levelData.levelID}`);
+    console.log(`\x1b[1;33m👤 Creator:\x1b[0m ${levelData.author.username}`);
+
+    // Difficulty and rating
+    console.log(`\n${divider}`);
+    console.log(`\x1b[1;36m⭐ RATINGS & DIFFICULTY\x1b[0m`);
+    console.log(divider);
+
+    const starDisplay = levelData.rating.stars > 0 ? `${levelData.rating.stars} ⭐` : "Unrated";
+    if (levelData.rating.stars > 0) console.log(`\x1b[1;33mStars:\x1b[0m ${starDisplay}`);
+
+    let difficultyName = levelData.difficulty.name;
+    let difficultyEmoji = getDifficultyEmoji(levelData.difficulty);
+    console.log(`\x1b[1;33mDifficulty:\x1b[0m ${difficultyName} ${difficultyEmoji}`);
+
+    if (levelData.rating.featuredStatus !== "Not Featured") console.log(`\x1b[1;33m🏆 Featured`);
+    if (levelData.rating.epicRating !== "None") {
+        console.log(`\x1b[1;33m✨ Epic Rating:\x1b[0m ${levelData.rating.epicRating}`);
+    }
+
+    // Stats
+    console.log(`\n${divider}`);
+    console.log(`\x1b[1;36m📊 STATISTICS\x1b[0m`);
+    console.log(divider);
+
+    console.log(`\x1b[1;33m❤️ Likes:\x1b[0m ${utils.formatNumber(levelData.stats.likes)}`);
+    console.log(`\x1b[1;33m⬇️ Downloads:\x1b[0m ${utils.formatNumber(levelData.stats.downloads)}`);
+
+    if (levelData.stats.objects > 0) {
+        console.log(`\x1b[1;33m🧩 Objects:\x1b[0m ${utils.formatNumber(levelData.stats.objects)}`);
+        if (levelData.stats.isLargeLevel) {
+            console.log(`\x1b[31m⚠️ Warning: Large level (>40k objects) may cause performance issues!\x1b[0m`);
+        }
+    }
+
+    // Length
+    console.log(`\x1b[1;33m📏 Length:\x1b[0m ${levelData.info.length.name}`);
+
+    // Coins
+    if (levelData.coins.total > 0) {
+        console.log(`\x1b[1;33m🪙 Coins:\x1b[0m ${levelData.coins.total}`);
+        if (levelData.coins.verified) {
+            console.log(`\x1b[32m✓ Silver coins\x1b[0m`);
+        }
+    }
+
+    // Music
+    if (levelData.music) {
+        console.log(`\n${divider}`);
+        console.log(`\x1b[1;36m🎵 MUSIC\x1b[0m`);
+        console.log(divider);
+        if (levelData.music.officialSong) {
+            const songName = enums.OfficialSongs.getName(levelData.music.officialSong);
+            console.log(`\x1b[1;33mOfficial Song ID:\x1b[0m ${songName}`);
+        }
+        if (levelData.music.customSongID) {
+            console.log(`\x1b[1;33mCustom Song ID:\x1b[0m ${levelData.music.customSongID}`);
+        }
+    }
+
+    // Description
+    if (levelData.description && levelData.description !== "") {
+        console.log(`\n${divider}`);
+        console.log(`\x1b[1;36m📝 DESCRIPTION\x1b[0m`);
+        console.log(divider);
+        console.log(`\x1b[0m${levelData.description}\x1b[0m`);
+    }
+
+    // Additional info
+    if (levelData.info) {
+        console.log(`\n${divider}`);
+        console.log(`\x1b[1;36m📅 ADDITIONAL INFO\x1b[0m`);
+        console.log(divider);
+        //console.log(`\x1b[1;33mUploaded:\x1b[0m ${levelData.info.uploadDate} ago`);
+        //if (levelData.info.updateDate && levelData.info.updateDate !== levelData.info.uploadDate) {
+        //console.log(`\x1b[1;33mUpdated:\x1b[0m ${levelData.info.updateDate} ago`);
+        //}
+        if (levelData.info.gameVersion && levelData.info.gameVersion !== "Unknown") {
+            console.log(`\x1b[1;33mGame Version:\x1b[0m ${levelData.info.gameVersion}`);
+        }
+        if (levelData.twoPlayer) {
+            console.log(`\x1b[1;33m👥 Two Players`);
+        }
+        if (levelData.hasPassword) {
+            console.log(`\x1b[1;33m🔒 Password Protected:\x1b[0m Yes`);
+            if (levelData.password && levelData.password !== "0") {
+                console.log(`\x1b[1;33mPassword:\x1b[0m ${levelData.password}`);
+            }
+        }
+    }
+
+    // Daily/Weekly
+    if (levelData.special?.isDaily) {
+        console.log(`\n\x1b[1;33m📅 This is a Daily Level (#${levelData.special.dailyNumber})\x1b[0m`);
+    } else if (levelData.special?.isWeekly) {
+        console.log(`\n\x1b[1;33m📅 This is a Weekly Level (#${levelData.special.dailyNumber - 100000})\x1b[0m`);
+    }
+
+    console.log(`\n${divider}`);
+
+    await question("\n\x1b[1;33m[Press Enter to return]\x1b[0m");
+}
+
+// Helper functions
+function getSearchTypeName(type) {
+    const types = {
+        0: "Search by name", 1: "Most downloaded", 2: "Most liked",
+        3: "Trending", 4: "Recent", 5: "User's levels",
+        6: "Featured", 7: "Magic", 8: "Mod sent",
+        10: "Level list", 11: "Awarded", 12: "Followed",
+        13: "Friends", 21: "Daily history", 22: "Weekly history"
+    };
+    return types[type] || "Unknown";
+}
+
+function getDifficultyEmoji(difficulty) {
+    if (difficulty.isAuto) return "🤖";
+    if (difficulty.isDemon) {
+        const demonEmojis = {
+            3: "😈",   // Easy Demon
+            4: "👿",   // Medium Demon  
+            0: "💀",   // Hard Demon
+            5: "🔱",   // Insane Demon
+            6: "👺"    // Extreme Demon
+        };
+        return demonEmojis[difficulty.demonDifficulty] || "😈";
+    }
+
+    const diffEmojis = {
+        10: "🔵",  // Easy
+        20: "🟢",  // Normal
+        30: "🟡",  // Hard
+        40: "🔴",  // Harder
+        50: "🟣"   // Insane
+    };
+    return diffEmojis[difficulty.icon] || "⚪";
+}
+
+function getEpicEmoji(epicRating) {
+    if (epicRating === "Epic") return "✨";
+    if (epicRating === "Legendary") return "🔥";
+    if (epicRating === "Mythic") return "💜";
+    return "";
 }
 
 /** ---------------- LOGOUT HELPER ---------------- **/
@@ -853,8 +1336,8 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[7]\x1b[0m Read Friend Requests    \x1b[1;36m[8]\x1b[0m Send a Friend Request`);
         console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`);
         console.log(` \x1b[1;36m[11]\x1b[0m Read Messages          \x1b[1;36m[12]\x1b[0m Send a Message`);
-        console.log(` \x1b[1;36m[13]\x1b[0m Check user`);
-        console.log(` \x1b[1;31m[14]\x1b[0m Logout & Exit          \x1b[1;31m[15]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[13]\x1b[0m Check user             \x1b[1;36m[14]\x1b[0m Level Search`);
+        console.log(` \x1b[1;31m[15]\x1b[0m Logout & Exit          \x1b[1;31m[16]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
 
@@ -871,8 +1354,9 @@ async function mainMenu(user) {
         else if (choice === '11') await readMessages(user);
         else if (choice === '12') await sendMessage(user);
         else if (choice === '13') await lookupUser(user);
-        else if (choice === '14') { await logout(); break; }
-        else if (choice === '15') process.exit();
+        else if (choice === '14') await levelSearch(user);
+        else if (choice === '15') { await logout(); break; }
+        else if (choice === '16') process.exit();
     }
 }
 

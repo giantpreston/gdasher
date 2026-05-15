@@ -3,9 +3,9 @@ const readline = require('readline');
 const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
-const enums = require('./enums')
+const enums = require('./enums');
 
-const VERSION = "0.1.7";
+const VERSION = "0.1.8";
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -93,6 +93,12 @@ const scene = (title) => {
     process.stdout.write('\x1b[2J\x1b[H');
     console.log(ASCII);
     console.log(`\x1b[44m\x1b[1;37m  ${title.toUpperCase().padEnd(60)}  \x1b[0m\n`);
+    // Version check on every scene
+    (async () => {
+        const res = await utils.getVersion();
+        if (res === VERSION) return;
+        console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is ${res}. Update to the latest version on the GitHub!`);
+    })();
 };
 
 /** ---------------- INITIAL FLOW ---------------- **/
@@ -1237,10 +1243,6 @@ async function viewLevelDetails(levelData, user) {
         console.log(`\n${divider}`);
         console.log(`\x1b[1;36m📅 ADDITIONAL INFO\x1b[0m`);
         console.log(divider);
-        //console.log(`\x1b[1;33mUploaded:\x1b[0m ${levelData.info.uploadDate} ago`);
-        //if (levelData.info.updateDate && levelData.info.updateDate !== levelData.info.uploadDate) {
-        //console.log(`\x1b[1;33mUpdated:\x1b[0m ${levelData.info.updateDate} ago`);
-        //}
         if (levelData.info.gameVersion && levelData.info.gameVersion !== "Unknown") {
             console.log(`\x1b[1;33mGame Version:\x1b[0m ${levelData.info.gameVersion}`);
         }
@@ -1264,7 +1266,64 @@ async function viewLevelDetails(levelData, user) {
 
     console.log(`\n${divider}`);
 
-    await question("\n\x1b[1;33m[Press Enter to return]\x1b[0m");
+    // Download option
+    console.log(`\n\x1b[1;33mOptions:\x1b[0m`);
+    console.log(`  \x1b[1;36m[1]\x1b[0m Download this level`);
+    console.log(`  \x1b[1;36m[2]\x1b[0m Return to search`);
+
+    const downloadChoice = await question("\n\x1b[1;35mCHOICE > \x1b[0m");
+
+    if (downloadChoice === '1') {
+        await downloadLevel(levelData.levelID, levelData.levelName, levelData.music.officialSong, levelData.music.customSongID, levelData.author.username);
+    }
+}
+
+async function downloadLevel(levelID, levelName, officialSongId, customSongId, creatorName) {
+    scene("Downloading Level");
+
+    console.log(`\x1b[1;33mDownloading level ${levelID}...\x1b[0m`);
+
+    const res = await network.makeRequest('downloadGJLevel22.php', {
+        levelID: levelID,
+        secret: network.SECRETS.common,
+        gameVersion: "22",
+        binaryVersion: "47"
+    }, DEBUG);
+
+    if (!res || res === "-1") {
+        console.log("\x1b[31mFailed to download level. Level may be unlisted or not exist.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    console.log("\x1b[32mLevel data received! Parsing...\x1b[0m");
+
+    // Parse the level data using utils.parseLevel (no fetchUserInfo needed for download)
+    const parsedLevel = await utils.parseLevel(res);
+
+    if (!parsedLevel) {
+        console.log("\x1b[31mFailed to parse level data.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    const levelString = parsedLevel.levelString;
+
+    if (!levelString || levelString === "") {
+        console.log("\x1b[31mLevel string is empty or corrupt.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    console.log(`\x1b[32mLevel parsed successfully! Creating .gmd file...\x1b[0m`);
+
+    // Create the GMD file using utils.createGMD
+    const fileName = utils.createGMD(levelName, creatorName, officialSongId ? null : customSongId, officialSongId || null, levelString);
+
+    console.log(`\n\x1b[32m✓ Level saved as: ${fileName}\x1b[0m`);
+    console.log(`\x1b[1;33mFile location: ${process.cwd()}\x1b[0m`);
+
+    await question("\n[Press Enter to continue]");
 }
 
 // Helper functions

@@ -1,9 +1,45 @@
 const crypto = require('crypto');
+const fs = require('fs');
+const now = new Date();
+const https = require('https');
 
 module.exports = {
     generateUDID: () => {
         const r = () => Math.floor(Math.random() * (100000000 - 100000 + 1)) + 100000;
         return `S15${r()}${r()}${r()}${r()}`;
+    },
+
+    getVersion: () =>
+        new Promise((resolve, reject) => {
+            https.get(
+                'https://raw.githubusercontent.com/giantpreston/gdasher/refs/heads/main/version.txt',
+                (res) => {
+                    let data = '';
+
+                    res.on('data', (chunk) => (data += chunk));
+                    res.on('end', () => resolve(data));
+                }
+            ).on('error', reject);
+        }),
+
+    createGMD: (name, creator, customSong, officialSng, level) => {
+        const fileName = `level_${now.getFullYear()}_${now.getMonth() + 1}_${now.getDate()}_${Math.floor(Math.random() * (17381927 - 1829) + 1829)}.gmd`;
+
+        let songData = "";
+
+        if (customSong) {
+            songData = `<k>k45</k><i>${customSong}</i>`;
+        } else if (officialSng && officialSng !== 0) {
+            songData = `<k>k8</k><i>${officialSng}</i>`;
+        }
+
+        const xml = `<?xml version="1.0"?><plist version="1.0" gjver="2.0"><dict><k>kCEK</k><i>4</i><k>k18</k><i>1</i><k>k36</k><i>7</i><k>k2</k><s>${name}</s><k>k4</k><s>${level}</s><k>k5</k><s>${creator}</s><k>k101</k><s>0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0</s><k>k11</k><i>66</i><k>k13</k><t /><k>k21</k><i>2</i><k>k16</k><i>1</i><k>k80</k><i>41</i><k>k27</k><i>66</i><k>k50</k><i>47</i><k>k47</k><t /><k>k48</k><i>1</i>${songData}</dict></plist>`;
+
+        fs.writeFile(fileName, xml, (err) => {
+            if (err) throw err;
+        });
+
+        return fileName;
     },
 
     base64Encode: (str) => {

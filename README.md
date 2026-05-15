@@ -24,7 +24,7 @@
 | **👥 Friends System** | Send/accept/reject requests, block users |
 | **✉️ Private Messages** | Send/receive/read DMs with read status |
 | **🔍 User Lookup** | View stats, socials, global rank, moderator status |
-| **⏬️ Level Download & Search** | Check the stats of any level and download them to a portable `.gmd` format to import with GDShare |
+| **⏬️ Level Download & Search** | Check the stats of any level and download them to a portable `.gmd` format to import with [GDShare](https://geode-sdk.org/mods/hjfod.gdshare) |
 | **📅 Daily/Weekly** | Check current featured levels & time remaining |
 | **🔐 Auth** | Register accounts & persistent login sessions |
 
@@ -97,7 +97,7 @@ node index.js
 ### Level lookup
 - Search for any level with custom filters
 - Check everything about a level at a glance on the level search results page, or view in-depth info on the full-screen page
-- Download full levels directly from the GD servers as `.gmd` files to be imported through the Geode GDShare mod
+- Download full levels directly from the GD servers as `.gmd` files to be imported through the [Geode GDShare](https://geode-sdk.org/mods/hjfod.gdshare) mod
 
 ---
 

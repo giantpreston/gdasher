@@ -208,8 +208,8 @@ gdasher/
 **Will I get banned?**  
 No, this uses the same public API as the official GD client.
 
-**Why no song download or level search?**  
-These are still being worked on! Level search, song and level downloading will come soon.
+**Why no song download?**  
+Song downloading is in the works!
 
 **Do I need to install anything?**  
 Nope! Just Node.js.

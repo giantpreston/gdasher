@@ -88,24 +88,20 @@ function hiddenQuestion(query) {
     });
 }
 
-const scene = (title) => {
+const scene = async (title) => {
     if (DEBUG !== true) console.clear();
     process.stdout.write('\x1b[2J\x1b[H');
     console.log(ASCII);
+    const res = await utils.getVersion();
     console.log(`\x1b[44m\x1b[1;37m  ${title.toUpperCase().padEnd(60)}  \x1b[0m\n`);
-    // Version check on every scene
-    (async () => {
-        const res = await utils.getVersion();
-        if (res === VERSION) return;
-        console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is ${res}. Update to the latest version on the GitHub!`);
-    })();
+    if (res !== VERSION) console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is v${res}. Update to the latest version on the GitHub!`);
 };
 
 /** ---------------- INITIAL FLOW ---------------- **/
 
 async function startFlow() {
     process.title = "GDasher | Not logged in";
-    scene("Welcome to GDasher");
+    await scene("Welcome to GDasher");
 
     console.log(` \x1b[1;36m[1]\x1b[0m Login`);
     console.log(` \x1b[1;36m[2]\x1b[0m Register New Account`);
@@ -123,7 +119,7 @@ async function startFlow() {
 /** ---------------- REGISTRATION ---------------- **/
 
 async function registerFlow() {
-    scene("Account Registration");
+    await scene("Account Registration");
 
     let userName = (await question("Username (type 'cancel' to leave): ")).trim();
     if (userName.toLowerCase() === "cancel") return startFlow();
@@ -165,7 +161,7 @@ async function registerFlow() {
 
 async function loginFlow() {
     process.title = "GDasher | Not logged in";
-    scene("Account Login");
+    await scene("Account Login");
 
     let userName = (await question("Username (type 'cancel' to leave): ")).trim();
     if (userName.toLowerCase() === "cancel") return startFlow();
@@ -222,7 +218,7 @@ function formatBanTime(seconds) {
 /** ---------------- LEVEL COMMENTS ---------------- **/
 
 async function viewLevelComments() {
-    scene("View Level Comments");
+    await scene("View Level Comments");
     let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
     if (levelID.toLowerCase() === "cancel") return;
 
@@ -258,7 +254,7 @@ async function viewLevelComments() {
 }
 
 async function postLevelComment(user) {
-    scene("Post Comment");
+    await scene("Post Comment");
 
     let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
     if (levelID.toLowerCase() === "cancel") return;
@@ -314,7 +310,7 @@ async function postLevelComment(user) {
 }
 
 async function deleteLevelComment(user) {
-    scene("Delete Level Comment");
+    await scene("Delete Level Comment");
     let levelID = (await question("Level ID (type 'cancel' to leave): ")).trim();
     if (levelID.toLowerCase() === "cancel") return;
 
@@ -335,7 +331,7 @@ async function deleteLevelComment(user) {
 /** ---------------- ACCOUNT COMMENTS ---------------- **/
 
 async function viewAccountComments(user) {
-    scene("Account Comments");
+    await scene("Account Comments");
     let targetID = (await question(`Acc ID (${user.accountID}) (type 'cancel' to leave): `) || user.accountID).trim();
     if (targetID.toLowerCase() === "cancel") return;
 
@@ -365,7 +361,7 @@ async function viewAccountComments(user) {
 }
 
 async function postAccountComment(user) {
-    scene("Post Status");
+    await scene("Post Status");
     let msg = (await question("Message (type 'cancel' to leave): ")).trim();
     if (msg.toLowerCase() === "cancel") return;
 
@@ -384,7 +380,7 @@ async function postAccountComment(user) {
 }
 
 async function deleteAccountComment(user) {
-    scene("Delete Account Comment");
+    await scene("Delete Account Comment");
     let commentID = (await question("Comment ID (type 'cancel' to leave): ")).trim();
     if (commentID.toLowerCase() === "cancel") return;
 
@@ -404,7 +400,7 @@ async function deleteAccountComment(user) {
 /** ---------------- SOCIAL ---------------- **/
 
 async function readFriendRequests(user) {
-    scene("Friend Requests");
+    await scene("Friend Requests");
     let choice = (await question("(0) Received or (1) Sent Requests (type 'cancel' to leave): ")).trim();
     let page = (await question("Page (0): ")).trim();
     if (!page || page == null) page = 0;
@@ -480,7 +476,7 @@ async function readFriendRequests(user) {
 }
 
 async function sendFriendRequest(user) {
-    scene("Send Friend Request");
+    await scene("Send Friend Request");
     let userName = (await question("Username (type 'cancel' to leave): ")).trim();
     if (userName.toLowerCase() === "cancel") return;
 
@@ -515,7 +511,7 @@ async function sendFriendRequest(user) {
 }
 
 async function checkUsers(user) {
-    scene("User List");
+    await scene("User List");
     const selection = (await question("(0) Friends or (1) Blocked (type 'cancel' to leave): ")).trim();
     if (selection.toLowerCase() == "cancel") {
         return mainMenu(user);
@@ -571,7 +567,7 @@ async function checkUsers(user) {
 }
 
 async function readMessages(user) {
-    scene("Messages");
+    await scene("Messages");
 
     const selection = (await question("(0) Received Messages or (1) Sent Messages (type 'cancel' to leave): ")).trim();
     let page = (await question("Page (0): ")).trim();
@@ -653,7 +649,7 @@ async function readMessages(user) {
 }
 
 async function sendMessage(user) {
-    scene("Send Message");
+    await scene("Send Message");
 
     const uname = (await question("Enter Username (type 'cancel' to leave): ")).trim();
     if (uname.toLowerCase() == "cancel") return;
@@ -701,7 +697,7 @@ async function sendMessage(user) {
 
 
 async function lookupUser(user) {
-    scene("User Lookup");
+    await scene("User Lookup");
     const userName = (await question("Username (type 'cancel' to leave): ")).trim().toLowerCase();
     if (userName == 'cancel') return;
     if (!userName) { console.log("\x1b[31mInvalid Username!\x1b[0m"); await question("[Press Enter]"); return lookupUser(user); };
@@ -772,7 +768,7 @@ async function lookupUser(user) {
 /** ---------------- LEVELS ---------------- **/
 
 async function checkDaily(user) {
-    scene("Daily/Weekly Lookup");
+    await scene("Daily/Weekly Lookup");
 
     let mode = (await question("(D)aily or (W)eekly level (type 'cancel' to leave): ")).trim().toUpperCase();
     if (mode.toLowerCase() == "cancel") return;
@@ -837,7 +833,7 @@ async function checkDaily(user) {
 }
 
 async function levelSearch(user) {
-    scene("Level Search");
+    await scene("Level Search");
 
     // Build filter object
     const filters = {};
@@ -1098,7 +1094,7 @@ async function levelSearch(user) {
             return sign + absNum.toString();
         }
 
-        scene(`Level Search Results - Page ${currentPage}${totalLevels > 0 ? ` (${levels.length}/${totalLevels} levels)` : ''}`);
+        await scene(`Level Search Results - Page ${currentPage}${totalLevels > 0 ? ` (${levels.length}/${totalLevels} levels)` : ''}`);
 
         console.log(`\x1b[1;33mFilters:\x1b[0m`);
         if (currentFilters.str) console.log(`  Query: "${currentFilters.str}"`);
@@ -1159,7 +1155,7 @@ async function levelSearch(user) {
 }
 
 async function viewLevelDetails(levelData, user) {
-    scene(`Level: ${levelData.levelName}`);
+    await scene(`Level: ${levelData.levelName}`);
 
     // Display full level details
     const divider = "\x1b[90m" + "═".repeat(78) + "\x1b[0m";
@@ -1279,7 +1275,7 @@ async function viewLevelDetails(levelData, user) {
 }
 
 async function downloadLevel(levelID, levelName, officialSongId, customSongId, creatorName) {
-    scene("Downloading Level");
+    await scene("Downloading Level");
 
     console.log(`\x1b[1;33mDownloading level ${levelID}...\x1b[0m`);
 
@@ -1387,7 +1383,7 @@ async function mainMenu(user) {
 
     while (true) {
         process.title = `GDasher | ${user.username}`;
-        scene(`Welcome, ${user.username} - v${VERSION}`);
+        await scene(`Welcome, ${user.username} - v${VERSION}`);
 
         console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
         console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);

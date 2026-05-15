@@ -171,6 +171,8 @@ gdasher/
 ├── network.js        # HTTP requests to Geometry Dash endpoints
 ├── utils.js          # Response parsers, base64, CHK generation
 ├── auth.dat          # Your saved session (auto-generated) (DON'T SHARE THIS!)
+├── enums.js          # All official songs mapped
+├── assets/           # Unused official GDasher icons
 └── screenshots/      # Documentation images
 ```
 

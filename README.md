@@ -24,6 +24,7 @@
 | **👥 Friends System** | Send/accept/reject requests, block users |
 | **✉️ Private Messages** | Send/receive/read DMs with read status |
 | **🔍 User Lookup** | View stats, socials, global rank, moderator status |
+| **⏬️ Level Download & Search** | Check the stats of any level and download them to a portable `.gmd` format to import with GDShare |
 | **📅 Daily/Weekly** | Check current featured levels & time remaining |
 | **🔐 Auth** | Register accounts & persistent login sessions |
 
@@ -93,6 +94,11 @@ node index.js
 - View their linked socials (YouTube, Twitter, Twitch, Discord, Instagram)
 - See their privacy settings
 
+### Level lookup
+- Search for any level with custom filters
+- Check everything about a level at a glance on the level search results page, or view in-depth info on the full-screen page
+- Download full levels directly from the GD servers as `.gmd` files to be imported through the Geode GDShare mod
+
 ---
 
 ## 📋 Command Reference
@@ -112,8 +118,9 @@ node index.js
 | `11` | Read Messages |
 | `12` | Send Message |
 | `13` | Lookup User |
-| `14` | Logout & Exit |
-| `15` | Exit |
+| `14` | Level Search |
+| `15` | Logout & Exit |
+| `16` | Exit |
 
 ---
 
@@ -172,7 +179,7 @@ gdasher/
 ## 🧪 API Endpoints Used
 
 <details>
-<summary>Click to see all 22 endpoints</summary>
+<summary>Click to see all 23 endpoints</summary>
 
 | Endpoint | Function |
 |----------|----------|
@@ -193,6 +200,7 @@ gdasher/
 | `unblockGJUser20.php` | Unblock |
 | `getGJMessages20.php` | Message list |
 | `downloadGJMessage20.php` | Read message |
+| `downloadGJLevel22.php` | Download level from servers |
 | `uploadGJMessage20.php` | Send message |
 | `getGJUsers20.php` | Search user |
 | `getGJUserInfo20.php` | User details |

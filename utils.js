@@ -1,6 +1,5 @@
 const crypto = require('crypto');
 const fs = require('fs');
-const now = new Date();
 const https = require('https');
 
 module.exports = {
@@ -23,6 +22,7 @@ module.exports = {
         }),
 
     createGMD: (name, creator, customSong, officialSng, level) => {
+        const now = new Date();
         const fileName = `level_${now.getFullYear()}_${now.getMonth() + 1}_${now.getDate()}_${Math.floor(Math.random() * (17381927 - 1829) + 1829)}.gmd`;
 
         let songData = "";

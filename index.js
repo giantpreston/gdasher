@@ -5,7 +5,8 @@ const network = require('./network');
 const utils = require('./utils');
 const enums = require('./enums');
 
-const VERSION = "0.1.8";
+const VERSION = "0.1.9";
+let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
 function debug(title, data) {
@@ -92,9 +93,8 @@ const scene = async (title) => {
     if (DEBUG !== true) console.clear();
     process.stdout.write('\x1b[2J\x1b[H');
     console.log(ASCII);
-    const res = await utils.getVersion();
     console.log(`\x1b[44m\x1b[1;37m  ${title.toUpperCase().padEnd(60)}  \x1b[0m\n`);
-    if (res !== VERSION) console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is v${res}. Update to the latest version on the GitHub!`);
+    if (LATEST_VERSION !== VERSION) console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is v${LATEST_VERSION}. Update to the latest version on the GitHub!`);
 };
 
 /** ---------------- INITIAL FLOW ---------------- **/
@@ -1417,6 +1417,11 @@ async function mainMenu(user) {
 
 /** ---------------- START ---------------- **/
 (async () => {
+    try {
+        const remoteVer = await utils.getVersion();
+        if (remoteVer) LATEST_VERSION = utils._stripAnsiAndControl ? utils._stripAnsiAndControl(remoteVer) : remoteVer;
+    } catch (e) { /* ignore version fetch errors */ }
+
     const saved = await auth.loadAuth();
     if (saved) await mainMenu(saved);
     else await startFlow();

@@ -33,7 +33,7 @@ module.exports = {
             songData = `<k>k8</k><i>${officialSng}</i>`;
         }
 
-        const xml = `<?xml version="1.0"?><plist version="1.0" gjver="2.0"><dict><k>kCEK</k><i>4</i><k>k18</k><i>1</i><k>k36</k><i>7</i><k>k2</k><s>${name}</s><k>k4</k><s>${level}</s><k>k5</k><s>${creator}</s><k>k101</k><s>0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0</s><k>k11</k><i>66</i><k>k13</k><t /><k>k21</k><i>2</i><k>k16</k><i>1</i><k>k80</k><i>41</i><k>k27</k><i>66</i><k>k50</k><i>47</i><k>k47</k><t /><k>k48</k><i>1</i>${songData}</dict></plist>`;
+        const xml = `<?xml version="1.0"?><plist version="1.0" gjver="2.0"><dict><k>kCEK</k><i>4</i><k>k18</k><i>1</i><k>k36</k><i>7</i><k>k2</k><s>${module.exports._xmlEscape(name)}</s><k>k4</k><s>${module.exports._xmlEscape(level)}</s><k>k5</k><s>${module.exports._xmlEscape(creator)}</s><k>k101</k><s>0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0</s><k>k11</k><i>66</i><k>k13</k><t /><k>k21</k><i>2</i><k>k16</k><i>1</i><k>k80</k><i>41</i><k>k27</k><i>66</i><k>k50</k><i>47</i><k>k47</k><t /><k>k48</k><i>1</i>${songData}</dict></plist>`;
 
         fs.writeFile(fileName, xml, (err) => {
             if (err) throw err;
@@ -44,6 +44,23 @@ module.exports = {
 
     base64Encode: (str) => {
         return Buffer.from(str).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+    },
+
+    _stripAnsiAndControl: (str) => {
+        if (typeof str !== 'string') return str;
+        let out = str.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+        out = out.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+        return out;
+    },
+
+    _xmlEscape: (str) => {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\"/g, '&quot;')
+            .replace(/'/g, '&apos;');
     },
 
     generateCHK: (values) => {
@@ -93,6 +110,7 @@ module.exports = {
                 try {
                     const b64 = data['35'].replace(/-/g, '+').replace(/_/g, '/');
                     decodedMessage = Buffer.from(b64, 'base64').toString('utf8');
+                    decodedMessage = module.exports._stripAnsiAndControl(decodedMessage);
                 } catch (e) {
                     decodedMessage = "[Decode Error]";
                 }
@@ -133,7 +151,7 @@ module.exports = {
         }
 
         return {
-            username: data['1'],
+            username: module.exports._stripAnsiAndControl(data['1'] || ''),
             userID: data['2'],
             stars: parseInt(data['3']) || 0,
             demons: parseInt(data['4']) || 0,
@@ -189,6 +207,7 @@ module.exports = {
                 try {
                     const b64 = obj['2'].replace(/-/g, '+').replace(/_/g, '/');
                     content = Buffer.from(b64, 'base64').toString('utf8').trim();
+                    content = module.exports._stripAnsiAndControl(content);
                 } catch (e) { content = "[Decode Error]"; }
             }
 
@@ -212,7 +231,7 @@ module.exports = {
             for (let i = 0; i < decoded.length; i++) {
                 result += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
             }
-            return result;
+            return module.exports._stripAnsiAndControl(result);
         } catch (e) {
             return "[Decode Error]";
         }
@@ -238,6 +257,7 @@ module.exports = {
             if (data['4']) {
                 try {
                     decodedTitle = Buffer.from(data['4'], 'base64').toString('utf8');
+                    decodedTitle = module.exports._stripAnsiAndControl(decodedTitle);
                 } catch (e) { decodedTitle = "[Title Error]"; }
             }
 
@@ -274,6 +294,7 @@ module.exports = {
             try {
                 const b64 = data['3'].replace(/-/g, '+').replace(/_/g, '/');
                 description = Buffer.from(b64, 'base64').toString('utf8');
+                description = module.exports._stripAnsiAndControl(description);
             } catch (e) { description = ""; }
         }
 
@@ -406,7 +427,7 @@ module.exports = {
 
         return {
             levelID: data['1'] || "0",
-            levelName: data['2'] || "Unnamed",
+            levelName: module.exports._stripAnsiAndControl(data['2'] || "Unnamed"),
             description: description,
             levelString: data['4'] || null,
             version: parseInt(data['5']) || 0,

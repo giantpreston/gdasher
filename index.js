@@ -5,7 +5,7 @@ const network = require('./network');
 const utils = require('./utils');
 const enums = require('./enums');
 
-const VERSION = "0.1.9";
+const VERSION = "0.2.0-rc1";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
@@ -94,7 +94,9 @@ const scene = async (title) => {
     process.stdout.write('\x1b[2J\x1b[H');
     console.log(ASCII);
     console.log(`\x1b[44m\x1b[1;37m  ${title.toUpperCase().padEnd(60)}  \x1b[0m\n`);
-    if (LATEST_VERSION !== VERSION) console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is v${LATEST_VERSION}. Update to the latest version on the GitHub!`);
+    const clean = VERSION.replace(/\d+$/, '');
+    if (clean.endsWith("-pr")) { console.log("\x1b[33mYou're running a pre-release! This version might be buggy and prone to crashing.\x1b[0m\n"); return; } else if (clean.endsWith("-rc")) { console.log("\x1b[36mYou're running a release candidate version! This version might be missing content coming in the next full release.\x1b[0m\n"); return; }
+    if (LATEST_VERSION !== VERSION) console.log(`\x1b[31mYour version of GDasher is out of date! (v${VERSION}), latest is v${LATEST_VERSION}. Update to the latest version on the GitHub!\x1b[0m\n`);
 };
 
 /** ---------------- INITIAL FLOW ---------------- **/
@@ -1364,6 +1366,32 @@ function getEpicEmoji(epicRating) {
     return "";
 }
 
+/** ---------------- SCORES ---------------- **/
+async function univScores(user) {
+    await scene("Scores");
+    let stat = "";
+
+    const scoreType = await question("Which scores do you want to see (top, relative, friends, creators): ");
+    if (!scoreType || !["top", "relative", "friends", "creators"].includes(scoreType)) { console.log("\x1b[31mInvalid choice!\x1b[0m"); await question("[Press Enter]"); return univScores(user) }
+    if (scoreType !== "creators") stat = await question("Filter by (stars, moons, demons, user coins): ");
+    if (!["stars", "moons", "demons", "user coins", ""].includes(stat)) { console.log("\x1b[31mInvalid choice!\x1b[0m"); await question("[Press Enter]"); return univScores(user) }
+
+    const res = await network.makeRequest('getGJScores20.php', stat === '' ? { secret: network.SECRETS.common, gameVersion: 22, binaryVersion: 47, udid: utils.generateUDID(), accountID: user.accountID, gjp2: user.gjp2, type: scoreType, count: 30 } : { secret: network.SECRETS.common, gameVersion: 22, binaryVersion: 47, udid: utils.generateUDID(), accountID: user.accountID, gjp2: user.gjp2, type: scoreType, stat, count: 30 }, DEBUG);
+    const parsed = utils.parseUserSearch(res);
+
+    console.log(`\n\x1b[1;37mScores (type: ${scoreType}, filter: ${stat}):\x1b[0m`); // print for clarity (in case they cant read)
+    let position = 0;
+    parsed.forEach(u => {
+        position++;
+
+        let id = `     \x1b[90m#${u.accountID.padEnd(23, ' ')}`;
+        let un = `\x1b[1;36m${u.username}\x1b[0m`;
+
+        console.log(`\x1b[1;37m#${position}\x1b[0m ${id} ${un}`);
+    });
+    await question("[Press Enter]");
+}
+
 /** ---------------- LOGOUT HELPER ---------------- **/
 
 async function logout() {
@@ -1392,7 +1420,8 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`);
         console.log(` \x1b[1;36m[11]\x1b[0m Read Messages          \x1b[1;36m[12]\x1b[0m Send a Message`);
         console.log(` \x1b[1;36m[13]\x1b[0m Check user             \x1b[1;36m[14]\x1b[0m Level Search`);
-        console.log(` \x1b[1;31m[15]\x1b[0m Logout & Exit          \x1b[1;31m[16]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[15]\x1b[0m Check Scores`);
+        console.log(` \x1b[1;31m[16]\x1b[0m Logout & Exit          \x1b[1;31m[17]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
 
@@ -1410,8 +1439,9 @@ async function mainMenu(user) {
         else if (choice === '12') await sendMessage(user);
         else if (choice === '13') await lookupUser(user);
         else if (choice === '14') await levelSearch(user);
-        else if (choice === '15') { await logout(); break; }
-        else if (choice === '16') process.exit();
+        else if (choice === '15') await univScores(user);
+        else if (choice === '16') { await logout(); break; }
+        else if (choice === '17') process.exit();
     }
 }
 

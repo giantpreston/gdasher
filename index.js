@@ -5,7 +5,7 @@ const network = require('./network');
 const utils = require('./utils');
 const enums = require('./enums');
 
-const VERSION = "0.2.0-rc1";
+const VERSION = "0.2.0-rc2";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
@@ -1366,6 +1366,20 @@ function getEpicEmoji(epicRating) {
     return "";
 }
 
+/** ---------------- MOD HANDLING ---------------- **/
+async function checkAccess(user) {
+    await scene("Req");
+
+    const res = await network.makeRequest('requestUserAccess.php', {
+        accountID: user.accountID, gjp2: user.gjp2, secret: network.SECRETS.common
+    }, DEBUG);
+
+    if (res === "-1") { console.log("\x1b[31mNothing found.\x1b[0m"); await question("[Press Enter]"); return; }
+    if (res === "1") { console.log("\x1b[33mDetected Moderator status.\x1b[0m"); await question("[Press Enter]"); return; }
+    if (res === "2") { console.log("\x1b[91mDetected Elder Moderator status.\x1b[0m"); await question("[Press Enter]"); return; }
+    if (res === "99") { console.log("\x1b[36mDetected Leaderboard Moderator status.\x1b[0m"); await question("[Press Enter]"); return; }
+}
+
 /** ---------------- SCORES ---------------- **/
 async function univScores(user) {
     await scene("Scores");
@@ -1420,8 +1434,8 @@ async function mainMenu(user) {
         console.log(` \x1b[1;36m[9]\x1b[0m Read Personal User List \x1b[1;36m[10]\x1b[0m Check daily/weekly`);
         console.log(` \x1b[1;36m[11]\x1b[0m Read Messages          \x1b[1;36m[12]\x1b[0m Send a Message`);
         console.log(` \x1b[1;36m[13]\x1b[0m Check user             \x1b[1;36m[14]\x1b[0m Level Search`);
-        console.log(` \x1b[1;36m[15]\x1b[0m Check Scores`);
-        console.log(` \x1b[1;31m[16]\x1b[0m Logout & Exit          \x1b[1;31m[17]\x1b[0m Exit\n`);
+        console.log(` \x1b[1;36m[15]\x1b[0m Check Scores           \x1b[1;36m[16]\x1b[0m REQ`);
+        console.log(` \x1b[1;31m[17]\x1b[0m Logout & Exit          \x1b[1;31m[18]\x1b[0m Exit\n`);
 
         const choice = await question("\x1b[1;35mGDASHER > \x1b[0m");
 
@@ -1440,8 +1454,9 @@ async function mainMenu(user) {
         else if (choice === '13') await lookupUser(user);
         else if (choice === '14') await levelSearch(user);
         else if (choice === '15') await univScores(user);
-        else if (choice === '16') { await logout(); break; }
-        else if (choice === '17') process.exit();
+        else if (choice === '16') await checkAccess(user);
+        else if (choice === '17') { await logout(); break; }
+        else if (choice === '18') process.exit();
     }
 }
 

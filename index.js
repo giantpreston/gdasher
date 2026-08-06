@@ -5,7 +5,7 @@ const network = require('./network');
 const utils = require('./utils');
 const enums = require('./enums');
 
-const VERSION = "0.2.0-rc2";
+const VERSION = "0.2.0";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
@@ -1366,6 +1366,13 @@ function getEpicEmoji(epicRating) {
     return "";
 }
 
+function getModLabel(modLevel) {
+    if (modLevel === 2) return "Elder Mod";
+    if (modLevel === 1) return "Mod";
+    if (modLevel === 3) return "Leaderboard Mod";
+    return "Player";
+}
+
 /** ---------------- MOD HANDLING ---------------- **/
 async function checkAccess(user) {
     await scene("Req");
@@ -1384,24 +1391,58 @@ async function checkAccess(user) {
 async function univScores(user) {
     await scene("Scores");
     let stat = "";
+    let statCode = "";
 
     const scoreType = await question("Which scores do you want to see (top, relative, friends, creators): ");
     if (!scoreType || !["top", "relative", "friends", "creators"].includes(scoreType)) { console.log("\x1b[31mInvalid choice!\x1b[0m"); await question("[Press Enter]"); return univScores(user) }
     if (scoreType !== "creators") stat = await question("Filter by (stars, moons, demons, user coins): ");
     if (!["stars", "moons", "demons", "user coins", ""].includes(stat)) { console.log("\x1b[31mInvalid choice!\x1b[0m"); await question("[Press Enter]"); return univScores(user) }
 
-    const res = await network.makeRequest('getGJScores20.php', stat === '' ? { secret: network.SECRETS.common, gameVersion: 22, binaryVersion: 47, udid: utils.generateUDID(), accountID: user.accountID, gjp2: user.gjp2, type: scoreType, count: 30 } : { secret: network.SECRETS.common, gameVersion: 22, binaryVersion: 47, udid: utils.generateUDID(), accountID: user.accountID, gjp2: user.gjp2, type: scoreType, stat, count: 30 }, DEBUG);
+    const statMap = {
+        stars: "0",
+        moons: "1",
+        demons: "2",
+        "user coins": "3"
+    };
+    statCode = stat ? statMap[stat] : "";
+
+    const requestParams = {
+        secret: network.SECRETS.common,
+        gameVersion: 22,
+        binaryVersion: 47,
+        udid: utils.generateUDID(),
+        accountID: user.accountID,
+        gjp2: user.gjp2,
+        dvs: 3,
+        type: scoreType,
+        count: 30
+    };
+
+    if (statCode !== "") requestParams.stat = statCode;
+
+    const res = await network.makeRequest('getGJScores20.php', requestParams, DEBUG);
     const parsed = utils.parseUserSearch(res);
 
-    console.log(`\n\x1b[1;37mScores (type: ${scoreType}, filter: ${stat}):\x1b[0m`); // print for clarity (in case they cant read)
-    let position = 0;
-    parsed.forEach(u => {
-        position++;
+    console.log(`\n\x1b[1;37mScores (type: ${scoreType}, filter: ${stat || 'all'}):\x1b[0m`); // print for clarity (in case they cant read)
+    console.log(`\x1b[90m${'─'.repeat(70)}\x1b[0m`);
 
-        let id = `     \x1b[90m#${u.accountID.padEnd(23, ' ')}`;
-        let un = `\x1b[1;36m${u.username}\x1b[0m`;
+    parsed.forEach((u, index) => {
+        const position = index + 1;
+        const modLabel = getModLabel(u.modLevel);
+        const socials = Object.entries(u.socials || {})
+            .filter(([, value]) => value)
+            .map(([key, value]) => `${key[0].toUpperCase()}${key.slice(1)}:${value}`)
+            .slice(0, 3);
 
-        console.log(`\x1b[1;37m#${position}\x1b[0m ${id} ${un}`);
+        console.log(`\n\x1b[1;36m#${position}\x1b[0m \x1b[1;37m${u.username}\x1b[0m`);
+        console.log(`  \x1b[90mAccount ID:\x1b[0m ${u.accountID || 'N/A'}  \x1b[90mPlayer ID:\x1b[0m ${u.userID || 'N/A'}`);
+        console.log(`  \x1b[90mRole:\x1b[0m ${modLabel}  \x1b[90mCreator Points:\x1b[0m ${utils.formatNumber(u.creatorPoints)}`);
+        console.log(`  \x1b[90mStars:\x1b[0m ${utils.formatNumber(u.stars)}  \x1b[90mDemons:\x1b[0m ${utils.formatNumber(u.demons)}  \x1b[90mMoons:\x1b[0m ${utils.formatNumber(u.moons)}`);
+        console.log(`  \x1b[90mDiamonds:\x1b[0m ${utils.formatNumber(u.diamonds)}  \x1b[90mSecret Coins:\x1b[0m ${utils.formatNumber(u.secretCoins)}  \x1b[90mUser Coins:\x1b[0m ${utils.formatNumber(u.userCoins)}`);
+
+        if (socials.length > 0) {
+            console.log(`  \x1b[90mSocials:\x1b[0m ${socials.join(' • ')}`);
+        }
     });
     await question("[Press Enter]");
 }

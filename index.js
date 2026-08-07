@@ -5,7 +5,7 @@ const network = require('./network');
 const utils = require('./utils');
 const enums = require('./enums');
 
-const VERSION = "0.2.0";
+const VERSION = "0.2.0-pr1";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
@@ -1428,21 +1428,11 @@ async function univScores(user) {
 
     parsed.forEach((u, index) => {
         const position = index + 1;
-        const modLabel = getModLabel(u.modLevel);
-        const socials = Object.entries(u.socials || {})
-            .filter(([, value]) => value)
-            .map(([key, value]) => `${key[0].toUpperCase()}${key.slice(1)}:${value}`)
-            .slice(0, 3);
 
-        console.log(`\n\x1b[1;36m#${position}\x1b[0m \x1b[1;37m${u.username}\x1b[0m`);
-        console.log(`  \x1b[90mAccount ID:\x1b[0m ${u.accountID || 'N/A'}  \x1b[90mPlayer ID:\x1b[0m ${u.userID || 'N/A'}`);
-        console.log(`  \x1b[90mRole:\x1b[0m ${modLabel}  \x1b[90mCreator Points:\x1b[0m ${utils.formatNumber(u.creatorPoints)}`);
+        console.log(`\n\x1b[1;36m#${position}\x1b[0m \x1b[1;37m${u.username}\x1b[0m `);
+        console.log(`  \x1b[90mAccount ID:\x1b[0m ${u.accountID || 'N/A'}  \x1b[90mPlayer ID:\x1b[0m ${u.userID || 'N/A'}  \x1b[90mCreator Points:\x1b[0m ${utils.formatNumber(u.creatorPoints)}`);
         console.log(`  \x1b[90mStars:\x1b[0m ${utils.formatNumber(u.stars)}  \x1b[90mDemons:\x1b[0m ${utils.formatNumber(u.demons)}  \x1b[90mMoons:\x1b[0m ${utils.formatNumber(u.moons)}`);
         console.log(`  \x1b[90mDiamonds:\x1b[0m ${utils.formatNumber(u.diamonds)}  \x1b[90mSecret Coins:\x1b[0m ${utils.formatNumber(u.secretCoins)}  \x1b[90mUser Coins:\x1b[0m ${utils.formatNumber(u.userCoins)}`);
-
-        if (socials.length > 0) {
-            console.log(`  \x1b[90mSocials:\x1b[0m ${socials.join(' • ')}`);
-        }
     });
     await question("[Press Enter]");
 }
@@ -1465,8 +1455,25 @@ async function mainMenu(user) {
     if (!user) return startFlow();
 
     while (true) {
+        function getHourString() {
+            try {
+                const now = new Date();
+                const hour = now.getHours();
+
+                if (hour >= 22) return "Night";
+                if (hour >= 19) return "Evening";
+                if (hour >= 13) return "Afternoon";
+                if (hour === 12) return "Noon";
+                if (hour >= 1) return "Morning";
+                if (hour === 0) return "Midnight";
+            } catch(e) {
+                return "Welcome";
+            }
+        }
+
+
         process.title = `GDasher | ${user.username}`;
-        await scene(`Welcome, ${user.username} - v${VERSION}`);
+        await scene(`${getHourString()}, ${user.username} - v${VERSION}`);
 
         console.log(` \x1b[1;36m[1]\x1b[0m View Level Comments     \x1b[1;36m[4]\x1b[0m View Account Comments`);
         console.log(` \x1b[1;36m[2]\x1b[0m Post Level Comment      \x1b[1;36m[5]\x1b[0m Post Account Comment`);

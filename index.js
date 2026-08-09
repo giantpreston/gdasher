@@ -1,11 +1,15 @@
 const fs = require("fs").promises;
+const fsSync = require("fs");
 const readline = require('readline');
 const auth = require('./auth');
 const network = require('./network');
 const utils = require('./utils');
 const enums = require('./enums');
+const https = require('https');
+const http = require('http');
+const path = require("path");
 
-const VERSION = "0.2.0-pr1";
+const VERSION = "0.2.1-pr2";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
@@ -1264,16 +1268,104 @@ async function viewLevelDetails(levelData, user) {
 
     console.log(`\n${divider}`);
 
-    // Download option
-    console.log(`\n\x1b[1;33mOptions:\x1b[0m`);
-    console.log(`  \x1b[1;36m[1]\x1b[0m Download this level`);
-    console.log(`  \x1b[1;36m[2]\x1b[0m Return to search`);
+    if (levelData.music.customSongID) {
+        console.log(`\n\x1b[1;33mOptions:\x1b[0m`);
+        console.log(`  \x1b[1;36m[1]\x1b[0m Download this level`);
+        console.log(`  \x1b[1;36m[2]\x1b[0m Download this level's song`)
+        console.log(`  \x1b[1;36m[3]\x1b[0m Return to search`);
 
-    const downloadChoice = await question("\n\x1b[1;35mCHOICE > \x1b[0m");
+        const downloadChoice = await question("\n\x1b[1;35mCHOICE > \x1b[0m");
 
-    if (downloadChoice === '1') {
-        await downloadLevel(levelData.levelID, levelData.levelName, levelData.music.officialSong, levelData.music.customSongID, levelData.author.username);
+        if (downloadChoice === '1') {
+            await downloadLevel(levelData.levelID, levelData.levelName, levelData.music.officialSong, levelData.music.customSongID, levelData.author.username);
+        } else if (downloadChoice === '2') {
+            await downloadSong(levelData.music.customSongID, levelData.levelName);
+        }
+    } else {
+        console.log(`\n\x1b[1;33mOptions:\x1b[0m`);
+        console.log(`  \x1b[1;36m[1]\x1b[0m Download this level`);
+        console.log(`  \x1b[1;36m[2]\x1b[0m Return to search`);
+
+        const downloadChoice = await question("\n\x1b[1;35mCHOICE > \x1b[0m");
+
+        if (downloadChoice === '1') {
+            await downloadLevel(levelData.levelID, levelData.levelName, levelData.music.officialSong, levelData.music.customSongID, levelData.author.username);
+        }
     }
+}
+
+async function downloadSong(songID, fallbackName) {
+    await scene("Downloading Song");
+
+    console.log(`\x1b[1;33mDownloading song ${songID}...\x1b[0m`);
+    const res = await network.makeRequest('getGJSongInfo.php', {
+        songID,
+        secret: network.SECRETS.common
+    }, DEBUG);
+
+    if (!res || res === "-1") {
+        console.log("\x1b[31mFailed to get song info.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    const parsedSong = utils.parseSong(res);
+    const songUrl = parsedSong?.link ? decodeURIComponent(parsedSong.link) : null;
+
+    if (!songUrl) {
+        console.log("\x1b[31mSong link was not provided by the server.\x1b[0m");
+        await question("[Press Enter]");
+        return;
+    }
+
+    const safeName = utils.sanitizeFileName(parsedSong?.name || fallbackName || "song", "song");
+    const extension = utils.getFileExtensionFromUrl(songUrl, ".mp3");
+    const outputPath = path.join(process.cwd(), `${safeName}${extension}`);
+
+    try {
+        await downloadUrlToFile(songUrl, outputPath);
+        console.log(`\x1b[32mSong saved successfully!\x1b[0m`);
+        console.log(`\x1b[1;33mFile location: ${outputPath}\x1b[0m`);
+    } catch (error) {
+        console.log(`\x1b[31mFailed to save song: ${error.message}\x1b[0m`);
+    }
+
+    await question("\n[Press Enter]");
+}
+
+function downloadUrlToFile(url, outputPath) {
+    return new Promise((resolve, reject) => {
+        const attemptDownload = (targetUrl, redirects = 0) => {
+            const parsedUrl = typeof targetUrl === 'string' ? new URL(targetUrl) : targetUrl;
+            const client = parsedUrl.protocol === 'https:' ? https : http;
+            const req = client.get(parsedUrl, (res) => {
+                const statusCode = res.statusCode || 0;
+                if ([301, 302, 303, 307, 308].includes(statusCode)) {
+                    const location = res.headers.location;
+                    if (location && redirects < 5) {
+                        res.resume();
+                        attemptDownload(new URL(location, parsedUrl), redirects + 1);
+                        return;
+                    }
+                }
+
+                if (statusCode >= 400) {
+                    res.resume();
+                    reject(new Error(`Received status ${statusCode}`));
+                    return;
+                }
+
+                const fileStream = fsSync.createWriteStream(outputPath);
+                res.pipe(fileStream);
+                fileStream.on('finish', () => fileStream.close(() => resolve(outputPath)));
+                fileStream.on('error', reject);
+            });
+
+            req.on('error', reject);
+        };
+
+        attemptDownload(url);
+    });
 }
 
 async function downloadLevel(levelID, levelName, officialSongId, customSongId, creatorName) {

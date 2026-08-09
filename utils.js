@@ -8,6 +8,42 @@ module.exports = {
         return `S15${r()}${r()}${r()}${r()}`;
     },
 
+    sanitizeFileName: (name, fallback = 'song') => {
+        if (!name && !fallback) return 'song';
+
+        const raw = String(name || fallback);
+        const lastDot = raw.lastIndexOf('.');
+        const extension = lastDot > 0 && lastDot > raw.lastIndexOf('/') && lastDot > raw.lastIndexOf('\\')
+            ? raw.slice(lastDot).toLowerCase()
+            : '';
+
+        const base = raw.slice(0, extension ? lastDot : raw.length)
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[<>:"/\\|?*\x00-\x1f]/g, ' ')
+            .trim()
+            .replace(/\s+/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .replace(/\.+$/g, '');
+
+        const sanitizedBase = (base || fallback).slice(0, 120 - extension.length);
+        return `${sanitizedBase}${extension}`;
+    },
+
+    getFileExtensionFromUrl: (url, fallback = '') => {
+        if (!url) return fallback;
+        try {
+            const parsed = new URL(url);
+            const match = parsed.pathname.match(/\.([a-z0-9]+)(?:$|[?#])/i);
+            if (match) return `.${match[1].toLowerCase()}`;
+        } catch (e) {
+            const match = String(url).match(/\.([a-z0-9]+)(?:$|[?#])/i);
+            if (match) return `.${match[1].toLowerCase()}`;
+        }
+        return fallback;
+    },
+
     getVersion: () =>
         new Promise((resolve, reject) => {
             https.get(
@@ -221,6 +257,121 @@ module.exports = {
         });
     },
 
+    parseSong: (rawResponse) => {
+        if (!rawResponse || rawResponse === "-1" || rawResponse === "") return null;
+
+        const mainData = rawResponse.split('#')[0];
+        const pairs = [];
+
+        const segments = mainData.includes(':') && mainData.includes('~|~')
+            ? mainData.split(':')
+            : mainData.includes('~|~')
+                ? mainData.split('~|~')
+                : [];
+
+        if (segments.length > 0) {
+            for (const segment of segments) {
+                if (!segment || !segment.includes('~|~')) continue;
+                const [rawKey, ...rawValueParts] = segment.split('~|~');
+                const key = rawKey.trim();
+                const value = rawValueParts.join('~|~').trim();
+                if (key) pairs.push([key, value]);
+            }
+        }
+
+        if (pairs.length === 0 && mainData.includes('~|~')) {
+            const rawPairs = mainData.split('~|~');
+            for (let i = 0; i < rawPairs.length - 1; i += 2) {
+                if (rawPairs[i] !== undefined && rawPairs[i + 1] !== undefined) {
+                    pairs.push([rawPairs[i], rawPairs[i + 1]]);
+                }
+            }
+        }
+
+        const data = {};
+        const fieldMap = {
+            1: 'id',
+            2: 'name',
+            3: 'artistID',
+            4: 'artistName',
+            5: 'size',
+            6: 'videoID',
+            7: 'youtubeURL',
+            8: 'isVerified',
+            9: 'songPriority',
+            10: 'link',
+            11: 'nongEnum',
+            12: 'extraArtistIDs',
+            13: 'isNew',
+            14: 'newType',
+            15: 'extraArtistNames',
+            16: 'downloadSoundtrackOverride'
+        };
+
+        const decodeValue = (value) => {
+            if (value === null || value === undefined) return value;
+            if (typeof value !== 'string') return value;
+
+            let decoded = value;
+            try {
+                decoded = decodeURIComponent(value);
+            } catch (e) {
+                decoded = value;
+            }
+
+            if (decoded === "0" || decoded === "1") {
+                return decoded === "1";
+            }
+
+            if (/^\d+(\.\d+)?$/.test(decoded)) {
+                return decoded.includes('.') ? parseFloat(decoded) : parseInt(decoded, 10);
+            }
+
+            return decoded;
+        };
+
+        for (const [key, value] of pairs) {
+            const normalizedKey = String(key).trim();
+            if (!normalizedKey) continue;
+
+            const fieldName = fieldMap[normalizedKey] || `key${normalizedKey}`;
+            let parsedValue = decodeValue(value);
+
+            if (fieldName === 'extraArtistIDs' && typeof parsedValue === 'string' && parsedValue !== '') {
+                parsedValue = parsedValue.split('.').map(v => {
+                    const trimmed = v.trim();
+                    return trimmed ? parseInt(trimmed, 10) : null;
+                }).filter(v => v !== null);
+            }
+
+            if (fieldName === 'extraArtistNames' && typeof parsedValue === 'string' && parsedValue !== '') {
+                parsedValue = parsedValue.split(',').map(v => v.trim()).filter(Boolean);
+            }
+
+            data[fieldName] = parsedValue;
+        }
+
+        return {
+            id: data.id || null,
+            name: data.name || null,
+            artistID: data.artistID || null,
+            artistName: data.artistName || null,
+            size: data.size || null,
+            videoID: data.videoID || null,
+            youtubeURL: data.youtubeURL || null,
+            isVerified: data.isVerified ?? false,
+            songPriority: data.songPriority || null,
+            link: data.link || null,
+            nongEnum: data.nongEnum || null,
+            extraArtistIDs: Array.isArray(data.extraArtistIDs) ? data.extraArtistIDs : [],
+            isNew: data.isNew ?? false,
+            newType: data.newType || null,
+            extraArtistNames: Array.isArray(data.extraArtistNames) ? data.extraArtistNames : [],
+            downloadSoundtrackOverride: data.downloadSoundtrackOverride || null,
+            raw: data
+        };
+    },
+
     decodeMessageContent: (encodedStr) => {
         if (!encodedStr) return "";
         try {
@@ -276,7 +427,7 @@ module.exports = {
         });
     },
 
-    parseLevel: async (rawResponse, fetchUserInfo = null) => {
+    parseLevel: async (rawResponse, fetchUserInfo = null, creatorInfo = null) => {
         if (!rawResponse || rawResponse === "-1") return null;
 
         const mainData = rawResponse.split('#')[0];
@@ -316,7 +467,12 @@ module.exports = {
         let accountID = null;
         const playerID = data['6'] || "0";
 
-        if (fetchUserInfo && typeof fetchUserInfo === 'function') {
+        const hasCreatorInfo = creatorInfo && (creatorInfo.username || creatorInfo.accountID !== undefined && creatorInfo.accountID !== null);
+
+        if (hasCreatorInfo) {
+            username = creatorInfo.username || "Unknown";
+            accountID = creatorInfo.accountID || null;
+        } else if (fetchUserInfo && typeof fetchUserInfo === 'function') {
             try {
                 const userInfo = await fetchUserInfo(playerID);
                 if (userInfo) {
@@ -528,13 +684,29 @@ module.exports = {
 
     parseLevelSearch: async (rawResponse, fetchUserInfo = null) => {
         if (!rawResponse || rawResponse === "-1") return [];
-        const mainData = rawResponse.split('#')[0];
+
+        const responseSections = rawResponse.split('#');
+        const mainData = responseSections[0] || "";
         if (!mainData || mainData === "") return [];
+
         const levelSegments = mainData.split('|');
+        const creatorSegments = (responseSections[1] || "")
+            .split('|')
+            .filter(Boolean)
+            .map(seg => {
+                const parts = seg.split(':');
+                return {
+                    playerID: parts[0] || null,
+                    username: parts[1] || null,
+                    accountID: parts[2] || null
+                };
+            });
+
         const levels = [];
-        for (const seg of levelSegments) {
+        for (const [index, seg] of levelSegments.entries()) {
             if (seg && seg.trim() !== "") {
-                const level = await module.exports.parseLevel(seg, fetchUserInfo);
+                const creatorInfo = creatorSegments[index] || null;
+                const level = await module.exports.parseLevel(seg, fetchUserInfo, creatorInfo);
                 if (level !== null) levels.push(level);
             }
         }

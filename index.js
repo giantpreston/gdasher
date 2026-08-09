@@ -9,7 +9,7 @@ const https = require('https');
 const http = require('http');
 const path = require("path");
 
-const VERSION = "0.2.1-pr2";
+const VERSION = "0.2.1-rc1";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 
@@ -716,7 +716,7 @@ async function lookupUser(user) {
     }
     const parsed1 = utils.parseUser(res1);
     const res = await network.makeRequest('getGJUserInfo20.php', {
-        targetAccountID: parsed1.accountID, gameVersion: 22, gameBinary: 47, secret: network.SECRETS.common // apparently if gameversion isnt 22, it wont return 3 for leaderboard moderators. god bless robtop.
+        targetAccountID: parsed1.accountID, gameVersion: 22, binaryVersion: 47, secret: network.SECRETS.common // apparently if gameversion isnt 22, it wont return 3 for leaderboard moderators. god bless robtop.
     }, DEBUG);
 
     const parsed = utils.parseUser(res);
@@ -987,6 +987,8 @@ async function levelSearch(user) {
 
     // Add required parameters
     filters.secret = network.SECRETS.common;
+    filters.accountID = user.accountID;
+    filters.gjp2 = user.gjp2;
     filters.gameVersion = "22";
     filters.binaryVersion = "47";
     filters.page = page;
@@ -1227,7 +1229,7 @@ async function viewLevelDetails(levelData, user) {
             const songName = enums.OfficialSongs.getName(levelData.music.officialSong);
             console.log(`\x1b[1;33mOfficial Song ID:\x1b[0m ${songName}`);
         }
-        if (levelData.music.customSongID) {
+        if (levelData.music.customSongID !== "0") {
             console.log(`\x1b[1;33mCustom Song ID:\x1b[0m ${levelData.music.customSongID}`);
         }
     }
@@ -1268,7 +1270,7 @@ async function viewLevelDetails(levelData, user) {
 
     console.log(`\n${divider}`);
 
-    if (levelData.music.customSongID) {
+    if (levelData.music.customSongID !== "0") {
         console.log(`\n\x1b[1;33mOptions:\x1b[0m`);
         console.log(`  \x1b[1;36m[1]\x1b[0m Download this level`);
         console.log(`  \x1b[1;36m[2]\x1b[0m Download this level's song`)

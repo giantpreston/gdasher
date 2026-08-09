@@ -702,10 +702,25 @@ module.exports = {
                 };
             });
 
+        const creatorLookup = new Map(
+            creatorSegments
+                .filter(creator => creator.playerID)
+                .map(creator => [String(creator.playerID), creator])
+        );
+
         const levels = [];
         for (const [index, seg] of levelSegments.entries()) {
             if (seg && seg.trim() !== "") {
-                const creatorInfo = creatorSegments[index] || null;
+                const levelParts = seg.split(':');
+                const levelData = {};
+                for (let i = 0; i < levelParts.length; i += 2) {
+                    if (levelParts[i + 1] !== undefined) {
+                        levelData[levelParts[i]] = levelParts[i + 1];
+                    }
+                }
+
+                const playerID = levelData['6'] || null;
+                const creatorInfo = creatorLookup.get(String(playerID)) || creatorSegments[index] || null;
                 const level = await module.exports.parseLevel(seg, fetchUserInfo, creatorInfo);
                 if (level !== null) levels.push(level);
             }

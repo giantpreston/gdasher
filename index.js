@@ -9,7 +9,7 @@ const https = require('https');
 const http = require('http');
 const path = require("path");
 
-const VERSION = "0.2.1-rc1";
+const VERSION = "0.2.1";
 let LATEST_VERSION = VERSION;
 const DEBUG = process.argv.includes('--debug');
 

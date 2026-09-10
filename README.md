@@ -1,5 +1,8 @@
 # GDasher
 
+> [!CAUTION]
+> GDasher is archived and no longer in active development. It probably will not be compatible with the upcoming Geometry Dash updates and continuing to use it could expose you to security risks. Proceed at your own risk!
+
 <div align="center">
 
 [![Download](https://img.shields.io/badge/⬇️%20Download-Latest-brightgreen)](https://github.com/giantpreston/gdasher/releases/latest)
